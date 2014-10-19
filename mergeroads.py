@@ -31,15 +31,46 @@ def setBBox(ways,nodes):
 
 def findCloseOverlappingRoads(way,possibleWays):
     l = []
-    bBoxN = float(way.attrib["bBoxN"])
-    bBoxS = float(way.attrib["bBoxS"])
-    bBoxW = float(way.attrib["bBoxW"])
-    bBoxE = float(way.attrib["bBoxE"])
+    bBoxN = way["bBoxN"]
+    bBoxS = way["bBoxS"]
+    bBoxW = way["bBoxW"]
+    bBoxE = way["bBoxE"]
     for w in possibleWays:
         if float(w.attrib["bBoxS"])<bBoxN and float(w.attrib["bBoxE"])>bBoxW and float(w.attrib["bBoxW"])<bBoxE and float(w.attrib["bBoxN"])>bBoxS:
             l.append(w)
     return l
 
+def combineRoads(ways):
+    l = {}
+    wl = []
+    for w in ways:
+        tags = w.findall("tag")
+        ref = 1
+        highway = ''
+        for t in tags:
+            if t.attrib['k'] == "ref":
+                ref = int(t.attrib['v'])
+            elif t.attrib['k'] == 'highway':
+                highway = t.attrib['v']
+        k = '%s%d' % (highway,ref)
+        if k in l:
+            e = l[k]
+            bBoxN = max(e['bBoxN'],float(w.attrib["bBoxN"]))
+            bBoxS = min(e['bBoxS'],float(w.attrib["bBoxS"]))
+            bBoxW = min(e['bBoxW'],float(w.attrib["bBoxW"]))
+            bBoxE = max(e['bBoxE'],float(w.attrib["bBoxE"]))
+            wl.append(w)
+            l[k] = {'ways': wl, 'bBoxN':bBoxN,'bBoxS':bBoxS,'bBoxW':bBoxW,'bBoxE':bBoxE}
+        else:
+            bBoxN = float(w.attrib["bBoxN"])
+            bBoxS = float(w.attrib["bBoxS"])
+            bBoxW = float(w.attrib["bBoxW"])
+            bBoxE = float(w.attrib["bBoxE"])
+            wl = [w]
+            l[k] = {'ways': wl, 'bBoxN':bBoxN,'bBoxS':bBoxS,'bBoxW':bBoxW,'bBoxE':bBoxE}
+
+
+    return l
 
 new = etree.parse("out.osm")
 old = etree.parse("old.osm")
@@ -49,13 +80,17 @@ newNodes = nodes2nodeList(new.findall("node"))
 oldWays = old.findall("way")
 oldNodes = nodes2nodeList(old.findall("node"))
 
-#TODO sla sammen veier
 setBBox(newWays,newNodes)
 setBBox(oldWays,oldNodes)
-
-ways = findCloseOverlappingRoads(newWays[0],oldWays)
-for w in ways:
-    print w.attrib
+newWays = combineRoads(newWays)
+for k,newWay in newWays.iteritems():
+    # Find roads with overlapping bBox (Union)
+    ways = findCloseOverlappingRoads(newWay,oldWays)
+    # TODO Find begining and end of road
+    # TODO Find length to nodes in way
+    # TODO Find mean and variance of distance between roads
+    # TODO newWay is in oldWays if mean<tolMean and var<tolVar
+    print len(ways)
 
 new.write("outParsed.osm")
 
