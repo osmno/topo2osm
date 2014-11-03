@@ -8,6 +8,7 @@ def nodes2nodeList(nodes):
         l[n.attrib['id']] = n
     return l
 
+# Find a bounding box in North, East, South, and West
 def setBBox(ways,nodes):
     for way in ways:
         bBoxE=-180.;
@@ -31,6 +32,7 @@ def setBBox(ways,nodes):
         way.set("bBoxN",str(bBoxN))
         way.set("bBoxS",str(bBoxS))
 
+# Itterates thourgh all ways in possibleWays and check if the bBox overlaps with the bbox of way.
 def findCloseOverlappingRoads(way,possibleWays):
     l = []
     bBoxN = way["bBoxN"]
@@ -42,6 +44,7 @@ def findCloseOverlappingRoads(way,possibleWays):
             l.append(w)
     return l
 
+# Combines way to a single object if the highway type and ref is equal
 def combineRoads(ways):
     l = {}
     wl = []
@@ -75,6 +78,7 @@ def combineRoads(ways):
 
     return l
 
+# Calculates the distance between two points
 def latLonDistance(lon, lat,lon2, lat2):
     R = 6373000.
 
@@ -89,6 +93,7 @@ def latLonDistance(lon, lat,lon2, lat2):
     c = 2 * atan2(sqrt(a), sqrt(1-a))
     return R * c
 
+# Calculate the distance to the closest node in way from node
 def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=0,maxNode=-1):
     node = nodeListNewWay[node.attrib['ref']]
     lat = float(node.attrib['lat'])
@@ -110,6 +115,7 @@ def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=
     assert shortestDistance < 1e100
     return {'node':iShortest, 'distance':shortestDistance}
 
+# Calculates the distance to the nearest node in NewWay (made by combine way).
 def nearestNodeInNewWay(node,nodeListCandidate,way,nodeListNewWay):
     node = nodeListCandidate[node.attrib['ref']]
     lat = float(node.attrib['lat'])
@@ -131,8 +137,10 @@ def nearestNodeInNewWay(node,nodeListCandidate,way,nodeListNewWay):
                 shortestDistance = distance
                 nodeShortest = nodeJ
                 segmentShortest = segmentI
+    assert shortestDistance < 1e100
     return {'segment':segmentShortest,'node':nodeShortest, 'distance':shortestDistance}
 
+# Calculate the mean and variance of the absolute distance between newWay and nodesCandidate
 def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate):        
     # Find length to nodes in way
     i = -1
@@ -154,6 +162,7 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
     variance = variance**.5
     return (mean,variance)
 
+# Find the closest nodes to the begining and end of newWay in nodesCandidate
 def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes):
     # Find begining and end of road
     beginingCandidate2newWay = nearestNodeInNewWay(nodesCandidate[0],oldNodes,newWay,newNodes)
