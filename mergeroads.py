@@ -93,12 +93,16 @@ def latLonDistance(lon, lat,lon2, lat2):
     c = 2 * atan2(sqrt(a), sqrt(1-a))
     return R * c
 
+def latLonBearing(lon1, lat1, lon2, lat2):
+    return atan2(cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(lon2-lon1), sin(lon2-lon1)*cos(lat2)) 
+
 # Calculate the distance to the closest node in way from node
 def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=0,maxNode=-1):
     node = nodeListNewWay[node.attrib['ref']]
     lat = float(node.attrib['lat'])
     lon = float(node.attrib['lon'])
     shortestDistance = 1e100
+    bearingToShortest = 0
     iShortest = -1
     i = -1
     for n in wayCandidate.findall("nd"):
@@ -110,10 +114,11 @@ def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=
             distance = latLonDistance(lon,lat,lon2,lat2)
             if distance < shortestDistance:
                 shortestDistance = distance
+                bearingToShortest = latLonBearing(lon,lat,lon2,lat2)
                 iShortest = i
 
     assert shortestDistance < 1e100
-    return {'node':iShortest, 'distance':shortestDistance}
+    return {'node':iShortest, 'distance':shortestDistance, 'bearing':bearingToShortest}
 
 # Calculates the distance to the nearest node in NewWay (made by combine way).
 def nearestNodeInNewWay(node,nodeListCandidate,way,nodeListNewWay):
@@ -140,16 +145,29 @@ def nearestNodeInNewWay(node,nodeListCandidate,way,nodeListNewWay):
     assert shortestDistance < 1e100
     return {'segment':segmentShortest,'node':nodeShortest, 'distance':shortestDistance}
 
-# Calculate the mean and variance of the absolute distance between newWay and nodesCandidate
+# Calculate the mean and variance of the distance between newWay and nodesCandidate
 def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate):        
     # Find length to nodes in way
     i = -1
     distance = []
+    prevLat = float(nodesCandidate[1].attrib['lat'])
+    prevLon = float(nodesCandidate[1].attrib['lon'])
     for node in nodesCandidate:
         i += 1
+        lat = float(node.attrib['lat'])
+        lon = float(node.attrib['lon'])
         if (i >= cropStartCandidate) and (cropEndCandidate < 0 or i<=cropEndCandidate):
             out = nearestNodeInNewWay(node,oldNodes,newWay,newNodes)
-            distance.append(out['distance'])
+            absDistance = out['distance']
+            # Find angle between direction to previous and nearest node
+            bearingToNearestNode = out['bearing']
+            bearingToPreviousNode = latLonBearing(lon, lat, prevLon, prevLat)
+            if i == 0:
+                bearingToPreviousNode -= pi
+            d = sin(bearingToNearestNode-bearingToPreviousNode)*absDistance
+            distance.append(d)
+        prevLat = lat
+        prevLon = lon
     # Find mean and variance of distance between roads
     mean = 0.
     for d in distance:
@@ -235,7 +253,7 @@ for k,newWay in newWays.iteritems():
         
         cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes)
         mean, variance = distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
-        if mean < 20 and variance < 5**2:
+        if abs(mean) < 20 and variance < 5**2:
             # newWay is in oldWays if mean<tolMean and var<tolVar
             for way in newWay['ways']:
                 new.getroot().remove(way)
