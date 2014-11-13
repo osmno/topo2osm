@@ -8,49 +8,25 @@ def nodes2nodeList(nodes):
         l[n.attrib['id']] = n
     return l
 
-# Find a bounding box in North, East, South, and West
-def setBBox(ways,nodes):
-    for way in ways:
-        bBoxE=-180.;
-        bBoxW=180.;
-        bBoxN=-90.;
-        bBoxS=90.;
-        for nd in way.findall("nd"):
-            n = nodes[nd.attrib['ref']]
-            lat = float(n.attrib["lat"])
-            lon = float(n.attrib["lon"])
-            if lat>bBoxN:
-                bBoxN = lat
-            if lat<bBoxS:
-                bBoxS = lat
-            if lon<bBoxW:
-                bBoxW = lon
-            if lon>bBoxE:
-                bBoxE = lon
-        way.set("bBoxE",str(bBoxE))
-        way.set("bBoxW",str(bBoxW))
-        way.set("bBoxN",str(bBoxN))
-        way.set("bBoxS",str(bBoxS))
-
 # Itterates thourgh all ways in possibleWays and check if the bBox overlaps with the bbox of way.
 def findCloseOverlappingRoads(way,possibleWays):
     l = []
-    bBoxN = way["bBoxN"]
-    bBoxS = way["bBoxS"]
-    bBoxW = way["bBoxW"]
-    bBoxE = way["bBoxE"]
+    bBoxN = way.bBoxN
+    bBoxS = way.bBoxS
+    bBoxW = way.bBoxW
+    bBoxE = way.bBoxE
     for w in possibleWays:
-        if float(w.attrib["bBoxS"])<bBoxN and float(w.attrib["bBoxE"])>bBoxW and float(w.attrib["bBoxW"])<bBoxE and float(w.attrib["bBoxN"])>bBoxS:
+        if float(w.bBoxS)<bBoxN and float(w.bBoxE)>bBoxW and float(w.bBoxW)<bBoxE and float(w.bBoxN)>bBoxS:
             l.append(w)
     return l
 
 # Combines way to a single object if the highway type and ref is equal
 def combineRoads(ways):
     l = {}
-    wl = []
+    unknownRef = -1
     for w in ways:
         tags = w.findall("tag")
-        ref = 1
+        ref = -1
         highway = ''
         for t in tags:
             if t.attrib['k'] == "ref":
@@ -58,22 +34,13 @@ def combineRoads(ways):
             elif t.attrib['k'] == 'highway':
                 highway = t.attrib['v']
         k = '%s%d' % (highway,ref)
+        if highway is '' or ref is -1:
+            k = str(unknownRef)
+            unknownRef += 1        
         if k in l:
-            e = l[k]
-            wl = e['ways']
-            bBoxN = max(e['bBoxN'],float(w.attrib["bBoxN"]))
-            bBoxS = min(e['bBoxS'],float(w.attrib["bBoxS"]))
-            bBoxW = min(e['bBoxW'],float(w.attrib["bBoxW"]))
-            bBoxE = max(e['bBoxE'],float(w.attrib["bBoxE"]))
-            wl.append(w)
-            l[k] = {'ways': wl, 'bBoxN':bBoxN,'bBoxS':bBoxS,'bBoxW':bBoxW,'bBoxE':bBoxE}
+            l[k].addWay(w)
         else:
-            bBoxN = float(w.attrib["bBoxN"])
-            bBoxS = float(w.attrib["bBoxS"])
-            bBoxW = float(w.attrib["bBoxW"])
-            bBoxE = float(w.attrib["bBoxE"])
-            wl = [w]
-            l[k] = {'ways': wl, 'bBoxN':bBoxN,'bBoxS':bBoxS,'bBoxW':bBoxW,'bBoxE':bBoxE}
+            l[k] = w
 
 
     return l
@@ -115,31 +82,6 @@ def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=
     assert shortestDistance < 1e100
     return {'node':iShortest, 'distance':shortestDistance}
 
-# Calculates the distance to the nearest node in NewWay (made by combine way).
-def nearestNodeInNewWay(node,nodeListCandidate,way,nodeListNewWay):
-    node = nodeListCandidate[node.attrib['ref']]
-    lat = float(node.attrib['lat'])
-    lon = float(node.attrib['lon'])
-    shortestDistance = 1e100
-    nodeShortest = -1
-    segmentShortest = -1
-    segmentI = -1
-    for segment in way['ways']:
-        segmentI += 1
-        nodeJ = -1
-        for n in segment.findall("nd"):
-            nodeJ += 1
-            n = nodeListNewWay[n.attrib['ref']]
-            lat2 = float(n.attrib["lat"])
-            lon2 = float(n.attrib["lon"])
-            distance = latLonDistance(lon,lat,lon2,lat2)
-            if distance < shortestDistance:
-                shortestDistance = distance
-                nodeShortest = nodeJ
-                segmentShortest = segmentI
-    assert shortestDistance < 1e100
-    return {'segment':segmentShortest,'node':nodeShortest, 'distance':shortestDistance}
-
 # Calculate the mean and variance of the absolute distance between newWay and nodesCandidate
 def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate):        
     # Find length to nodes in way
@@ -148,7 +90,7 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
     for node in nodesCandidate:
         i += 1
         if (i >= cropStartCandidate) and (cropEndCandidate < 0 or i<=cropEndCandidate):
-            out = nearestNodeInNewWay(node,oldNodes,newWay,newNodes)
+            out = nearestNodeInWay(node,oldNodes,newWay,newNodes)
             distance.append(out['distance'])
     # Find mean and variance of distance between roads
     mean = 0.
@@ -165,10 +107,10 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
 # Find the closest nodes to the begining and end of newWay in nodesCandidate
 def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes):
     # Find begining and end of road
-    beginingCandidate2newWay = nearestNodeInNewWay(nodesCandidate[0],oldNodes,newWay,newNodes)
-    endCandidate2newWay = nearestNodeInNewWay(nodesCandidate[-1],oldNodes,newWay,newNodes)
-    beginingNewWay2Candidate =  nearestNodeInWay(newWay['ways'][0].findall('nd')[0],newNodes,candidate,oldNodes)
-    endNewWay2Candidate =       nearestNodeInWay(newWay['ways'][-1].findall('nd')[-1],newNodes,candidate,oldNodes)
+    beginingCandidate2newWay = nearestNodeInWay(nodesCandidate[0],oldNodes,newWay,newNodes)
+    endCandidate2newWay = nearestNodeInWay(nodesCandidate[-1],oldNodes,newWay,newNodes)
+    beginingNewWay2Candidate =  nearestNodeInWay(newWay.findall('nd')[0],newNodes,candidate,oldNodes)
+    endNewWay2Candidate =       nearestNodeInWay(newWay.findall('nd')[-1],newNodes,candidate,oldNodes)
     ## Check if candidate way should be reversed
     cropStartCandidate = 0
     cropEndCandidate = 0
@@ -207,6 +149,37 @@ def removeNodesNotInWay():
     for r in ref:
         new.getroot().remove(newNodes[str(r)])
 
+# Class for wrapping and combining ways
+class wayWrapper:
+    ways = []
+    bBoxN = -90.
+    bBoxE = -180.
+    bBoxS = 90.
+    bBoxW = 180.        
+    def __init__(self,way,nodes):
+        self.ways = [way]
+        for nd in way.findall("nd"):
+            n = nodes[nd.attrib['ref']]
+            lat = float(n.attrib["lat"])
+            lon = float(n.attrib["lon"])
+            self.bBoxN = max(self.bBoxN,lat)
+            self.bBoxS = min(self.bBoxS,lat)
+            self.bBoxW = min(self.bBoxW,lon)
+            self.bBoxE = max(self.bBoxE,lon)
+    def addWay(self,way):
+        for i in range(len(way.ways)):
+            self.ways.append(way.ways[i])
+        self.boxN = max(self.bBoxN,way.bBoxN)
+        self.boxE = max(self.bBoxE,way.bBoxE)
+        self.boxW = min(self.bBoxW,way.bBoxW)
+        self.boxS = min(self.bBoxS,way.bBoxS)
+        
+    def findall(self,searchString):
+        res = self.ways[0].findall(searchString)
+        for i in range(1,len(self.ways)):
+            res += self.ways[i].findall(searchString)
+        return res
+
 if len(sys.argv) is not 4:
     print """The script requires three inputs, %d was given
 Usage: python mergeroads new.osm old.osm output.osm
@@ -224,8 +197,12 @@ newNodes = nodes2nodeList(new.findall("node"))
 oldWays = old.findall("way")
 oldNodes = nodes2nodeList(old.findall("node"))
 
-setBBox(newWays,newNodes)
-setBBox(oldWays,oldNodes)
+for i in range(len(newWays)):
+    newWays[i] = wayWrapper(newWays[i],newNodes)
+
+for i in range(len(oldWays)):
+    oldWays[i] = wayWrapper(oldWays[i],oldNodes)
+
 newWays = combineRoads(newWays)
 for k,newWay in newWays.iteritems():
     # Find roads with overlapping bBox (Union)
@@ -237,7 +214,7 @@ for k,newWay in newWays.iteritems():
         mean, variance = distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
         if mean < 20 and variance < 5**2:
             # newWay is in oldWays if mean<tolMean and var<tolVar
-            for way in newWay['ways']:
+            for way in newWay.ways:
                 new.getroot().remove(way)
             break
 
