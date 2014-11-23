@@ -1,6 +1,9 @@
 from lxml import etree
-from math import sin, cos, sqrt, atan2, radians, pi
+from math import sin, radians, pi,fabs
+import geographiclib.geodesic as gg
 import sys
+import cProfile
+
 
 def nodes2nodeList(nodes):
     l = {}
@@ -47,21 +50,12 @@ def combineRoads(ways):
 
 # Calculates the distance between two points
 def latLonDistance(lon, lat,lon2, lat2):
-    R = 6373000.
-
-    lat1 = radians(lat)
-    lon1 = radians(lon)
-    lat2 = radians(lat2)
-    lon2 = radians(lon2)
-
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = (sin(dlat/2))**2 + cos(lat1) * cos(lat2) * (sin(dlon/2))**2
-    c = 2 * atan2(sqrt(a), sqrt(1-a))
-    return R * c
+    out = gg.Geodesic.WGS84.Inverse(lat,lon,lat2,lon2)
+    return out["s12"]
 
 def latLonBearing(lon1, lat1, lon2, lat2):
-    return atan2(cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(lon2-lon1), sin(lon2-lon1)*cos(lat2)) 
+    out = gg.Geodesic.WGS84.Inverse(lat1,lon1,lat2,lon2)
+    return radians(out["azi1"])
 
 # Calculate the distance to the closest node in way from node
 def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=0,maxNode=-1):
@@ -104,7 +98,7 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
         lon = float(n.attrib['lon'])
         if (i >= cropStartCandidate) and (cropEndCandidate < 0 or i<=cropEndCandidate):
             out = nearestNodeInWay(node,oldNodes,newWay,newNodes)
-            absDistance = out['distance']
+            absDistance = fabs(out['distance'])
             # Find angle between direction to previous and nearest node
             bearingToNearestNode = out['bearing']
             bearingToPreviousNode = latLonBearing(lon, lat, prevLon, prevLat)
@@ -227,7 +221,7 @@ def main():
         oldWays[i] = wayWrapper(oldWays[i],oldNodes)
     
     newWays = combineRoads(newWays)
-    for k,newWay in newWays.iteritems():
+    for _,newWay in newWays.iteritems():
         # Find roads with overlapping bBox (Union)
         closeWays = findCloseOverlappingRoads(newWay,oldWays)
         for wayCandidate in closeWays:
@@ -249,3 +243,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+cProfile.run('main()')

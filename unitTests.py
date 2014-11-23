@@ -1,5 +1,6 @@
-from mergeroads import findCropCandidate,distanceBetweenWays,nodes2nodeList
+from mergeroads import findCropCandidate,distanceBetweenWays,nodes2nodeList,latLonDistance,latLonBearing
 from lxml import etree
+from math import pi, fabs
 import unittest
 
 class TestSequenceFunctions(unittest.TestCase):
@@ -12,8 +13,20 @@ class TestSequenceFunctions(unittest.TestCase):
         nodesCandidate = candidate.findall('nd')
         cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,newNodes,newWay,newNodes,candidate)
         mean, variance = distanceBetweenWays(newNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
-        self.assertEqual(950, mean)
-        self.assertEqual(0, variance, "Var is wrong")
+        self.assertAlmostEqual(950, fabs(mean),delta=2)
+        self.assertAlmostEqual(0, variance, delta=2)
+        
+    def test_distance_between_nodes(self):
+        test = etree.parse("testfiles/twoNodes640m140deg.osm")
+        nodes = test.findall("node")
+        lat1 = float(nodes[0].attrib["lat"])
+        lat2 = float(nodes[1].attrib["lat"])
+        lon1 = float(nodes[0].attrib["lon"])
+        lon2 = float(nodes[1].attrib["lon"])
+        
+        self.assertAlmostEqual(640, latLonDistance(lon1, lat1, lon2, lat2),delta=2)
+        self.assertAlmostEqual(140-180, latLonBearing(lon1, lat1, lon2, lat2)*180/pi,delta=.1) 
+        
 
 if __name__ == '__main__':
     unittest.main()
