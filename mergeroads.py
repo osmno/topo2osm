@@ -127,12 +127,12 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
     return (mean,variance)
 
 # Find the closest nodes to the begining and end of newWay in nodesCandidate
-def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes):
+def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes,wayCandidate):
     # Find begining and end of road
     beginingCandidate2newWay = nearestNodeInWay(nodesCandidate[0],oldNodes,newWay,newNodes)
     endCandidate2newWay = nearestNodeInWay(nodesCandidate[-1],oldNodes,newWay,newNodes)
-    beginingNewWay2Candidate =  nearestNodeInWay(newWay.findall('nd')[0],newNodes,candidate,oldNodes)
-    endNewWay2Candidate =       nearestNodeInWay(newWay.findall('nd')[-1],newNodes,candidate,oldNodes)
+    beginingNewWay2Candidate =  nearestNodeInWay(newWay.findall('nd')[0],newNodes,wayCandidate,oldNodes)
+    endNewWay2Candidate =       nearestNodeInWay(newWay.findall('nd')[-1],newNodes,wayCandidate,oldNodes)
     ## Check if candidate way should be reversed
     cropStartCandidate = 0
     cropEndCandidate = 0
@@ -159,17 +159,17 @@ def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes):
     return cropStartCandidate, cropEndCandidate
 
 ## remove delted nodes
-def removeNodesNotInWay():
+def removeNodesNotInWay(newOsm, newNodes):
     # list all nodes
     ref = set()
     for i in newNodes:
         ref.add(int(i))
-    for way in new.getroot().findall('way'):
+    for way in newOsm.getroot().findall('way'):
         for n in way.findall('nd'):
             if int(n.attrib['ref']) in ref:
                 ref.remove(int(n.attrib['ref']))
     for r in ref:
-        new.getroot().remove(newNodes[str(r)])
+        newOsm.getroot().remove(newNodes[str(r)])
 
 # Class for wrapping and combining ways
 class wayWrapper:
@@ -201,48 +201,51 @@ class wayWrapper:
         for i in range(1,len(self.ways)):
             res += self.ways[i].findall(searchString)
         return res
-
-if len(sys.argv) is not 4:
-    print """The script requires three inputs, %d was given
-Usage: python mergeroads new.osm old.osm output.osm
-- new.osm  Data to be merged into old.osm
-- old.osm Existing data, new ways should not be close to ways in old.osm
-- output.osm Output file
-Input was: %s """  % (len(sys.argv)-1, str(sys.argv))
-    exit()
     
-new = etree.parse(sys.argv[1])
-old = etree.parse(sys.argv[2])
-
-newWays = new.findall("way")
-newNodes = nodes2nodeList(new.findall("node"))
-oldWays = old.findall("way")
-oldNodes = nodes2nodeList(old.findall("node"))
-
-for i in range(len(newWays)):
-    newWays[i] = wayWrapper(newWays[i],newNodes)
-
-for i in range(len(oldWays)):
-    oldWays[i] = wayWrapper(oldWays[i],oldNodes)
-
-newWays = combineRoads(newWays)
-for k,newWay in newWays.iteritems():
-    # Find roads with overlapping bBox (Union)
-    closeWays = findCloseOverlappingRoads(newWay,oldWays)
-    for candidate in closeWays:
-        nodesCandidate = candidate.findall('nd')
+def main():
+    if len(sys.argv) is not 4:
+        print """The script requires three inputs, %d was given
+    Usage: python mergeroads new.osm old.osm output.osm
+    - new.osm  Data to be merged into old.osm
+    - old.osm Existing data, new ways should not be close to ways in old.osm
+    - output.osm Output file
+    Input was: %s """  % (len(sys.argv)-1, str(sys.argv))
+        exit()
         
-        cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes)
-        mean, variance = distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
-        if abs(mean) < 20 and variance < 5**2:
-            # newWay is in oldWays if mean<tolMean and var<tolVar
-            for way in newWay.ways:
-                new.getroot().remove(way)
-            break
+    new = etree.parse(sys.argv[1])
+    old = etree.parse(sys.argv[2])
+    
+    newWays = new.findall("way")
+    newNodes = nodes2nodeList(new.findall("node"))
+    oldWays = old.findall("way")
+    oldNodes = nodes2nodeList(old.findall("node"))
+    
+    for i in range(len(newWays)):
+        newWays[i] = wayWrapper(newWays[i],newNodes)
+    
+    for i in range(len(oldWays)):
+        oldWays[i] = wayWrapper(oldWays[i],oldNodes)
+    
+    newWays = combineRoads(newWays)
+    for k,newWay in newWays.iteritems():
+        # Find roads with overlapping bBox (Union)
+        closeWays = findCloseOverlappingRoads(newWay,oldWays)
+        for wayCandidate in closeWays:
+            nodesCandidate = wayCandidate.findall('nd')
+            
+            cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes,wayCandidate)
+            mean, variance = distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
+            if abs(mean) < 20 and variance < 5**2:
+                # newWay is in oldWays if mean<tolMean and var<tolVar
+                for way in newWay.ways:
+                    new.getroot().remove(way)
+                break
+    
+    
+    
+    
+    removeNodesNotInWay(new,newNodes)
+    new.write(sys.argv[3])
 
-
-
-
-removeNodesNotInWay()
-new.write(sys.argv[3])
-
+if __name__ == "__main__":
+    main()
