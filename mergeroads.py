@@ -1,8 +1,10 @@
 from lxml import etree
-from math import sin, radians, pi,fabs
+from math import sin, pi,fabs, sqrt
 import geographiclib.geodesic as gg
 import sys
 import cProfile
+from numpy import arctan2
+
 
 
 def nodes2nodeList(nodes):
@@ -48,28 +50,48 @@ def combineRoads(ways):
 
     return l
 
+
+
 # Calculates the distance between two points
 def latLonDistance(lon, lat,lon2, lat2):
-    out = gg.Geodesic.WGS84.Inverse(lat,lon,lat2,lon2)
-    return out["s12"]
+    if not hasattr(latLonDistance, "dxdlon"):
+        # Linearization of distance
+        dlat = .001
+        out = gg.Geodesic.WGS84.Inverse(lat,lon,lat+dlat,lon)
+        latLonDistance.dydlat = out["s12"]/dlat
+        dlon = .001
+        out = gg.Geodesic.WGS84.Inverse(lat,lon,lat,lon+dlon)
+        latLonDistance.dxdlon = out["s12"]/dlon
+    dx = (lon2-lon)*latLonDistance.dxdlon
+    dy = (lat2-lat)*latLonDistance.dydlat
+    return sqrt(dx*dx+dy*dy)
 
 def latLonBearing(lon1, lat1, lon2, lat2):
-    out = gg.Geodesic.WGS84.Inverse(lat1,lon1,lat2,lon2)
-    return radians(out["azi1"])
+    if not hasattr(latLonBearing, "dxdlon"):
+        # Linearization of distance
+        dlat = .001
+        out = gg.Geodesic.WGS84.Inverse(lat1,lon1,lat1+dlat,lon1)
+        latLonBearing.dydlat = out["s12"]/dlat
+        dlon = .001
+        out = gg.Geodesic.WGS84.Inverse(lat1,lon1,lat1,lon1+dlon)
+        latLonBearing.dxdlon = out["s12"]/dlon
+    dx = (lon2-lon1)*latLonBearing.dxdlon
+    dy = (lat2-lat1)*latLonBearing.dydlat
+    return arctan2(dx,dy)
 
 # Calculate the distance to the closest node in way from node
-def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=0,maxNode=-1):
-    node = nodeListNewWay[node.attrib['ref']]
+def nearestNodeInWay(node,way,nodeListWay,minNode=0,maxNode=-1):
+ #   node = nodeListNewWay[node.attrib['ref']]
     lat = float(node.attrib['lat'])
     lon = float(node.attrib['lon'])
     shortestDistance = 1e100
     bearingToShortest = 0
     iShortest = -1
     i = -1
-    for n in wayCandidate.findall("nd"):
+    for n in way.findall("nd"):
         i += 1
         if (i>= minNode) and (maxNode<0 or i <= maxNode ):
-            n = nodeListCandidate[n.attrib['ref']]
+            n = nodeListWay[n.attrib['ref']]
             lat2 = float(n.attrib["lat"])
             lon2 = float(n.attrib["lon"])
             distance = latLonDistance(lon,lat,lon2,lat2)
@@ -82,22 +104,28 @@ def nearestNodeInWay(node,nodeListNewWay,wayCandidate,nodeListCandidate,minNode=
     return {'node':iShortest, 'distance':shortestDistance, 'bearing':bearingToShortest}
 
 # Calculate the mean and variance of the absolute distance between newWay and nodesCandidate
-def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate):        
+# oldNodes - list of nodes elements 
+def distanceBetweenWays(way1, nodes1, way2, nodes2,cropStartWay1,cropEndWay1):          
     # Find length to nodes in way
     i = -1
     distance = []
-    if len(nodesCandidate) < 2:
-        raise ValueError('Way must consist of multiple nodes')
-    n = oldNodes[nodesCandidate[1].attrib['ref']]
+    nodesWay1 = way1.findall("nd")
+    
+    if len(nodesWay1) < 2 or (cropStartWay1 >= cropEndWay1 and cropEndWay1 > 0) or (cropStartWay1 is len(nodesWay1) -1) :
+        print('Ignoring way with one node. CropStart: %d CropEnd: %d Length: %d' % (cropStartWay1,cropEndWay1, len(nodesWay1)))
+        return (1e100,1e100)
+    else:
+        print('Not ignoring way with one node. CropStart: %d CropEnd: %d Length: %d' % (cropStartWay1,cropEndWay1, len(nodesWay1)))
+    n = nodes1[nodesWay1[1].attrib['ref']]
     prevLat = float(n.attrib['lat'])
     prevLon = float(n.attrib['lon'])
-    for node in nodesCandidate:
+    for node in nodesWay1:
         i += 1
-        n = oldNodes[node.attrib["ref"]]
+        n = nodes1[node.attrib["ref"]]
         lat = float(n.attrib['lat'])
         lon = float(n.attrib['lon'])
-        if (i >= cropStartCandidate) and (cropEndCandidate < 0 or i<=cropEndCandidate):
-            out = nearestNodeInWay(node,oldNodes,newWay,newNodes)
+        if (i >= cropStartWay1) and (cropEndWay1 < 0 or i<=cropEndWay1):
+            out = nearestNodeInWay(nodes1[node.attrib["ref"]],way2,nodes2)
             absDistance = fabs(out['distance'])
             # Find angle between direction to previous and nearest node
             bearingToNearestNode = out['bearing']
@@ -121,36 +149,38 @@ def distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandida
     return (mean,variance)
 
 # Find the closest nodes to the begining and end of newWay in nodesCandidate
-def findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes,wayCandidate):
+def findCropCandidate(way1,nodes1,way2,nodes2):
     # Find begining and end of road
-    beginingCandidate2newWay = nearestNodeInWay(nodesCandidate[0],oldNodes,newWay,newNodes)
-    endCandidate2newWay = nearestNodeInWay(nodesCandidate[-1],oldNodes,newWay,newNodes)
-    beginingNewWay2Candidate =  nearestNodeInWay(newWay.findall('nd')[0],newNodes,wayCandidate,oldNodes)
-    endNewWay2Candidate =       nearestNodeInWay(newWay.findall('nd')[-1],newNodes,wayCandidate,oldNodes)
+    beginingWay1ToWay2 =  nearestNodeInWay(nodes1[way1.findall('nd')[0].attrib["ref"]],way2,nodes2)
+    endWay1ToWay2 =       nearestNodeInWay(nodes1[way1.findall('nd')[-1].attrib["ref"]],way2,nodes2)
+    beginingWay2ToWay1 =  nearestNodeInWay(nodes2[way2.findall('nd')[0].attrib["ref"]],way1,nodes1)
+    endWay2ToWay1 =        nearestNodeInWay(nodes2[way2.findall('nd')[-1].attrib["ref"]],way1,nodes1)
     ## Check if candidate way should be reversed
-    cropStartCandidate = 0
-    cropEndCandidate = 0
+    cropStartWay1 = 0
+    cropEndWay1 = 0
     # Check which begining is closest to the other road
-    if (beginingNewWay2Candidate['node']<endNewWay2Candidate['node']):
-        if beginingNewWay2Candidate['distance']<beginingCandidate2newWay['distance']:
-            cropStartCandidate = beginingNewWay2Candidate['node']
+    if (beginingWay2ToWay1['node']<endWay2ToWay1['node']):
+        if beginingWay2ToWay1['distance']<beginingWay1ToWay2['distance']:
+            cropStartWay1 = beginingWay2ToWay1['node']
         else:
-            cropStartCandidate = 0
-        if endNewWay2Candidate['distance']<endCandidate2newWay['distance']:
-            cropEndCandidate = endNewWay2Candidate['node']
+            cropStartWay1 = 0
+        if endWay2ToWay1['distance']<endWay1ToWay2['distance']:
+            cropEndWay1 = endWay2ToWay1['node']
         else:
-            cropEndCandidate = -1
+            cropEndWay1 = -1
                     
     else:
-        if beginingNewWay2Candidate['distance']<endCandidate2newWay['distance']:
-            cropEndCandidate = beginingNewWay2Candidate['node']
+        # reverse direction
+        if beginingWay2ToWay1['distance']<endWay1ToWay2['distance']:
+            cropEndWay1 = beginingWay2ToWay1['node']
         else:
-            cropEndCandidate = -1
-        if endNewWay2Candidate['distance']<beginingCandidate2newWay['distance']:
-            cropStartCandidate = endNewWay2Candidate['node']
+            cropEndWay1 = -1
+        if endWay2ToWay1['distance']<beginingWay1ToWay2['distance']:
+            cropStartWay1 = endWay2ToWay1['node']
         else:
-            cropStartCandidate = 0  
-    return cropStartCandidate, cropEndCandidate
+            cropStartWay1 = 0  
+    assert (cropStartWay1 < cropEndWay1) or (cropEndWay1 is -1), "crop start %d crop end %d" % (cropStartWay1,cropEndWay1)
+    return cropStartWay1, cropEndWay1
 
 ## remove delted nodes
 def removeNodesNotInWay(newOsm, newNodes):
@@ -225,10 +255,8 @@ def main():
         # Find roads with overlapping bBox (Union)
         closeWays = findCloseOverlappingRoads(newWay,oldWays)
         for wayCandidate in closeWays:
-            nodesCandidate = wayCandidate.findall('nd')
-            
-            cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,oldNodes,newWay,newNodes,wayCandidate)
-            mean, variance = distanceBetweenWays(oldNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
+            cropStartCandidate, cropEndCandidate = findCropCandidate(wayCandidate,oldNodes,newWay,newNodes)
+            mean, variance = distanceBetweenWays(newWay,newNodes,wayCandidate,oldNodes,cropStartCandidate,cropEndCandidate)
             if abs(mean) < 20 and variance < 5**2:
                 # newWay is in oldWays if mean<tolMean and var<tolVar
                 for way in newWay.ways:
@@ -244,4 +272,8 @@ def main():
 if __name__ == "__main__":
     main()
     
-cProfile.run('main()')
+    cProfile.run('main()', 'restats',sort="cumtime")
+    import pstats
+    p = pstats.Stats('restats')
+    p.dump_stats("profile.txt")
+    p.sort_stats("cumtime").print_callers()

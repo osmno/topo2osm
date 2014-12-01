@@ -8,17 +8,18 @@ class TestSequenceFunctions(unittest.TestCase):
         test = etree.parse("testfiles/testParallel950m.osm")
         newWays = test.findall("way")
         newNodes = nodes2nodeList(test.findall("node"))
-        candidate = newWays[1]
+        wayCandidate = newWays[1]
         newWay = newWays[0]
-        nodesCandidate = candidate.findall('nd')
-        cropStartCandidate, cropEndCandidate = findCropCandidate(nodesCandidate,newNodes,newWay,newNodes,candidate)
-        mean, variance = distanceBetweenWays(newNodes,newWay,newNodes,nodesCandidate,cropStartCandidate,cropEndCandidate)
+        cropStartCandidate, cropEndCandidate = findCropCandidate(wayCandidate,newNodes,newWay,newNodes)
+        mean, variance = distanceBetweenWays(newWay,newNodes,wayCandidate,newNodes,cropStartCandidate,cropEndCandidate) 
         self.assertAlmostEqual(950, fabs(mean),delta=2)
         self.assertAlmostEqual(0, variance, delta=2)
         
     def test_distance_between_nodes(self):
+        
         test = etree.parse("testfiles/twoNodes640m140deg.osm")
         nodes = test.findall("node")
+        
         lat1 = float(nodes[0].attrib["lat"])
         lat2 = float(nodes[1].attrib["lat"])
         lon1 = float(nodes[0].attrib["lon"])
