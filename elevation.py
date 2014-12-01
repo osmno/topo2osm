@@ -77,7 +77,6 @@ class Elevation:
         #         assert d.yMax > yMaxOld
         #         yMaxOld = d.yMax
                 #print('yMax: %d' % yMaxOld)
-        print("Finished loading DEM files")
             
                 
     def getElevation(self,x,y):

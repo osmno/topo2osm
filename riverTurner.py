@@ -9,6 +9,7 @@ from mergeroads import nodes2nodeList
 from elevation import Elevation
 import sys
 import utm
+from math import fabs
 
 elevation = Elevation()
 
@@ -29,11 +30,14 @@ def turnTivers(fileName,fileNameOut):
                 nd = way.findall("nd")
                 h1 = getElevation(nodes[nd[0].attrib['ref']])
                 h2 = getElevation(nodes[nd[-1].attrib['ref']])
-                if (h1 < h2):
+
+                if (fabs(h1-h2)>.5 and h1 < h2):
                     for n in nd:
                         way.remove(n)
                         for i in range(len(nd)-1,-1,-1):
                             way.append(nd[i])
+                if (fabs(h1-h2)<2):
+                    way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, elevation difference is %.1f' % int(h1-h2)} ))
     
     osmFile.write(fileNameOut)
 
