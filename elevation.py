@@ -3,7 +3,9 @@ import os
 
 class DemFile:
     xMin = None
+    xMax = None
     dx = None
+    yMin = None
     yMax = None
     dy = None
     data = None
@@ -13,8 +15,11 @@ class DemFile:
         gt = self.dem.GetGeoTransform()
         self.xMin = gt[0]
         self.dx = gt[1]
+        self.xMax = self.xMin+self.dx*self.dem.RasterXSize
         self.yMax = gt[3]
         self.dy = gt[5]
+        self.yMin = self.yMax+self.dy*self.dem.RasterYSize
+        
         
     def getElevation(self,x,y):
         if self.data is None:
@@ -35,7 +40,7 @@ class DemFile:
             V2 = v1*(1-di)+v2*di
             return V1*(1-dj)+V2*dj
         except IndexError:
-            raise Exception("Out of range of loaded DEM file")
+            raise IndexError("Out of range of loaded DEM file x: %f y: %f" %(x,y))
 
 class Elevation:
     demFiles = []
@@ -83,8 +88,9 @@ class Elevation:
         for row in self.demFiles:
             if row['xMin'] <= x:
                 for dem in row['dem']:
-                    if dem.yMax >= y:
+                    if dem.yMax >= y and dem.yMin <= y and dem.xMax >= x:
                         return dem.getElevation(x,y)
+        raise IndexError("Out of range of loaded DEM file x: %f y: %f" %(x,y))
                         
 if __name__ == '__main__':
     import unittest
@@ -93,5 +99,7 @@ if __name__ == '__main__':
         def test_some_points(self):
             self.assertAlmostEqual(ele.getElevation(209930.508, 6970410.426),1598.,delta=1.5)
             self.assertAlmostEqual(ele.getElevation(211366.488, 6970090.438),1060.,delta=1.5)
+        def test_problem_points(self):
+            self.assertAlmostEqual(ele.getElevation(449791.999741 ,7135302.004209),915.,delta=10.)
             
     unittest.main()

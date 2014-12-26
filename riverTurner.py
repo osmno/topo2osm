@@ -10,6 +10,7 @@ from elevation import Elevation
 import sys
 import utm
 from math import fabs
+import os
 
 elevation = Elevation()
 
@@ -28,29 +29,44 @@ def turnTivers(fileName,fileNameOut):
         for tag in way.findall("tag"):
             if "k" in tag.attrib and tag.attrib["k"] == "waterway" and (tag.attrib["v"] == "river" or tag.attrib["v"] == "stream"):
                 nd = way.findall("nd")
-                h1 = getElevation(nodes[nd[0].attrib['ref']])
-                h2 = getElevation(nodes[nd[-1].attrib['ref']])
+                try:
+                    h1 = getElevation(nodes[nd[0].attrib['ref']])
+                    h2 = getElevation(nodes[nd[-1].attrib['ref']])
 
-                if (fabs(h1-h2)>.5 and h1 < h2):
-                    for n in nd:
-                        way.remove(n)
-                        for i in range(len(nd)-1,-1,-1):
-                            way.append(nd[i])
-                if (fabs(h1-h2)<2):
-                    way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, elevation difference is %.1f' % int(h1-h2)} ))
+                    if (fabs(h1-h2)>.5 and h1 < h2):
+                        for n in nd:
+                            way.remove(n)
+                            for i in range(len(nd)-1,-1,-1):
+                                way.append(nd[i])
+                    if (fabs(h1-h2)<2):
+                        way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, elevation difference is %.1f' % int(h1-h2)} ))
+                except IndexError as e:
+                    print(e)
+                    way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, could not check elevation difference'} ))
+ 
     
     osmFile.write(fileNameOut)
 
 
 if __name__ == '__main__':
     fileName = "OppdalAraldekke.osm"
-    if (len(sys.argv) != 3):
+    if (len(sys.argv) == 2):
+        files = os.listdir(sys.argv[1])
+        for f in files:
+            if f.split(".")[-1] == "osm":
+                print("processing %s" % f)
+                fileName = os.path.join(sys.argv[1],f)
+                turnTivers(fileName,fileName)
+                
+        
+    elif (len(sys.argv) != 3):
         print("""The script requires two inputs:
 Usage:
 python riverTurner.py inputFile outPutfile
             
             """)
         exit()
-    fileName = sys.argv[1]
-    fileNameOut = sys.argv[2]
-    turnTivers(fileName, fileNameOut)
+    else:
+        fileName = sys.argv[1]
+        fileNameOut = sys.argv[2]
+        turnTivers(fileName, fileNameOut)
