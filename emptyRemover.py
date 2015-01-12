@@ -26,7 +26,7 @@ import os
 #             self.bBoxE = max(self.bBoxE,lon)
             
 class relationWrapper:
-    outerWays = []
+    outerWays = None
     element = None  
     findall = None
     remove = None
@@ -38,13 +38,16 @@ class relationWrapper:
         self.findall = element.findall
         self.remove = element.remove
         self.append = element.append
+        self.outerWays = set()
         for way in element.findall("member"):
             if way.attrib["type"] == "way" and way.attrib["role"] == "outer":
                 #self.includeArea(ways[way.attrib["ref"]])
-                self.outerWays.append(way.attrib["ref"])
+                self.outerWays.add(way.attrib["ref"])
                 
     
-#     def includeArea(self,element):
+    def includeArea(self,element):
+        for w in element.outerWays:
+            self.outerWays.add(w)
 #         self.bBoxN = max(self.bBoxN,element.bBoxN)
 #         self.bBoxN = max(self.bBoxE,element.bBoxE)
 #         self.bBoxN = min(self.bBoxW,element.bBoxW)
@@ -95,24 +98,24 @@ def simplifyRelations(osmFile,relations):
             for rel in multipolygons:
                 i += 1
                 if not i in ignoreRel:
-                    for j in range(i+1,len(multipolygons)):            
-                        if not j in ignoreRel:
+                    for j in range(0,len(multipolygons)):            
+                        if i != j and (not j in ignoreRel):
                             cand = multipolygons[j]
-                            equalOuter = []
-                            for way in rel.outerWays:
-                                if way in cand.outerWays:
-                                    equalOuter.append(way)
+                            equalOuter = rel.outerWays & cand.outerWays
                             if len(equalOuter)>0:
-                                hasMerged = True
+                                #hasMerged = True
                                 for mem in rel.findall("member"):
                                     if (mem.attrib["ref"] in equalOuter):
                                         rel.remove(mem)
                                 for cmem in cand.findall("member"):
                                     if not (cmem.attrib["ref"] in equalOuter):
                                         rel.append(cmem)
-                                osmFile.getroot().remove(cand.element)
+                                try:
+                                    osmFile.getroot().remove(cand.element)
+                                except ValueError:
+                                    print("Could not remove %s" % cand.element.attrib["id"])
                                 ignoreRel.add(j)
-                                #rel.includeArea(cand)
+                                rel.includeArea(cand)
                             
             
     
