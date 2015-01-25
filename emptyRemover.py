@@ -59,34 +59,35 @@ class relationWrapper:
 def simplifyRelations(osmFile,relations):
     categories = []
     for rel in relations:
-        isMultipolygon = False
-        tags = dict()
-        for tag in rel.findall("tag"):
-            if "k" in tag.attrib:
-                if tag.attrib["k"] =="type" and tag.attrib["v"] == "multipolygon":
-                    isMultipolygon = True
-                elif tag.attrib["k"] == "source:date":
-                    pass
-                else:
-                    tags[tag.attrib["k"]] = tag.attrib["v"]
-
-        if isMultipolygon:
-            # Find category
-            isEqual = False
-            for cat in categories:
-                catTags = cat["tags"]
-                if len(catTags) == len(tags):
-                    isEqual = True
-                    for key, value in tags.iteritems():
-                        if not ( (key in catTags) and (catTags[key] == value)):
-                            isEqual = False
+        if int(rel.attrib["id"])<0:
+            isMultipolygon = False
+            tags = dict()
+            for tag in rel.findall("tag"):
+                if "k" in tag.attrib:
+                    if tag.attrib["k"] =="type" and tag.attrib["v"] == "multipolygon":
+                        isMultipolygon = True
+                    elif tag.attrib["k"] == "source:date":
+                        pass
+                    else:
+                        tags[tag.attrib["k"]] = tag.attrib["v"]
+    
+            if isMultipolygon:
+                # Find category
+                isEqual = False
+                for cat in categories:
+                    catTags = cat["tags"]
+                    if len(catTags) == len(tags):
+                        isEqual = True
+                        for key, value in tags.iteritems():
+                            if not ( (key in catTags) and (catTags[key] == value)):
+                                isEqual = False
+                                break
+                            
+                        if isEqual:
+                            cat["relation"].append(rel)
                             break
-                        
-                    if isEqual:
-                        cat["relation"].append(rel)
-                        break
-            if not isEqual:
-                categories.append({"tags":tags,"relation":[rel]})
+                if not isEqual:
+                    categories.append({"tags":tags,"relation":[rel]})
     
     for cat in categories:
         ignoreRel = set()
@@ -97,25 +98,26 @@ def simplifyRelations(osmFile,relations):
             i = -1
             for rel in multipolygons:
                 i += 1
-                if not i in ignoreRel:
+                if (not i in ignoreRel) and (int(rel.attrib["id"])<0):
                     for j in range(0,len(multipolygons)):            
                         if i != j and (not j in ignoreRel):
                             cand = multipolygons[j]
-                            equalOuter = rel.outerWays & cand.outerWays
-                            if len(equalOuter)>0:
-                                #hasMerged = True
-                                for mem in rel.findall("member"):
-                                    if (mem.attrib["ref"] in equalOuter):
-                                        rel.remove(mem)
-                                for cmem in cand.findall("member"):
-                                    if not (cmem.attrib["ref"] in equalOuter):
-                                        rel.append(cmem)
-                                try:
-                                    osmFile.getroot().remove(cand.element)
-                                except ValueError:
-                                    print("Could not remove %s" % cand.element.attrib["id"])
-                                ignoreRel.add(j)
-                                rel.includeArea(cand)
+                            if int(cand.attrib["id"])<0:
+                                equalOuter = rel.outerWays & cand.outerWays
+                                if len(equalOuter)>0:
+                                    #hasMerged = True
+                                    for mem in rel.findall("member"):
+                                        if (mem.attrib["ref"] in equalOuter):
+                                            rel.remove(mem)
+                                    for cmem in cand.findall("member"):
+                                        if not (cmem.attrib["ref"] in equalOuter):
+                                            rel.append(cmem)
+                                    try:
+                                        osmFile.getroot().remove(cand.element)
+                                    except ValueError:
+                                        print("Could not remove %s" % cand.element.attrib["id"])
+                                    ignoreRel.add(j)
+                                    rel.includeArea(cand)
                             
             
     
@@ -133,7 +135,7 @@ def removeRel(fileName,fileNameOut):
                 break
         if keep:
             members = rel.findall("member")
-            if len(members) == 1:
+            if len(members) == 1 and members[0].attrib["ref"] < 0:
                 member = members[0]
                 if (member.attrib["type"] == "way"):
                     member = ways[member.attrib["ref"]]
