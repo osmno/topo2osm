@@ -48,6 +48,78 @@ class relationWrapper:
     def includeArea(self,element):
         for w in element.outerWays:
             self.outerWays.add(w)
+#         self.bBoxN = max(self.bBoxN,element.bBoxN)
+#         self.bBoxN = max(self.bBoxE,element.bBoxE)
+#         self.bBoxN = min(self.bBoxW,element.bBoxW)
+#         self.bBoxN = min(self.bBoxS,element.bBoxS)
+#     def overlaps(self,element):
+#         return (self.bBoxW < element.bBoxE or self.bBoxE > element.bBoxW) \
+#             and (self.bBoxS < element.bBoxN or self.boxN > element.bBoxS)
+
+def simplifyRelations(osmFile,relations):
+    categories = []
+    for rel in relations:
+        if int(rel.attrib["id"])<0:
+            isMultipolygon = False
+            tags = dict()
+            for tag in rel.findall("tag"):
+                if "k" in tag.attrib:
+                    if tag.attrib["k"] =="type" and tag.attrib["v"] == "multipolygon":
+                        isMultipolygon = True
+                    elif tag.attrib["k"] == "source:date":
+                        pass
+                    else:
+                        tags[tag.attrib["k"]] = tag.attrib["v"]
+    
+            if isMultipolygon:
+                # Find category
+                isEqual = False
+                for cat in categories:
+                    catTags = cat["tags"]
+                    if len(catTags) == len(tags):
+                        isEqual = True
+                        for key, value in tags.iteritems():
+                            if not ( (key in catTags) and (catTags[key] == value)):
+                                isEqual = False
+                                break
+                            
+                        if isEqual:
+                            cat["relation"].append(rel)
+                            break
+                if not isEqual:
+                    categories.append({"tags":tags,"relation":[rel]})
+    
+    for cat in categories:
+        ignoreRel = set()
+        multipolygons = cat["relation"]
+        hasMerged = True
+        while hasMerged:
+            hasMerged = False
+            i = -1
+            for rel in multipolygons:
+                i += 1
+                if (not i in ignoreRel) and (int(rel.attrib["id"])<0):
+                    for j in range(0,len(multipolygons)):            
+                        if i != j and (not j in ignoreRel):
+                            cand = multipolygons[j]
+                            if int(cand.attrib["id"])<0:
+                                equalOuter = rel.outerWays & cand.outerWays
+                                if len(equalOuter)>0:
+                                    #hasMerged = True
+                                    for mem in rel.findall("member"):
+                                        if (mem.attrib["ref"] in equalOuter):
+                                            rel.remove(mem)
+                                    for cmem in cand.findall("member"):
+                                        if not (cmem.attrib["ref"] in equalOuter):
+                                            rel.append(cmem)
+                                    try:
+                                        osmFile.getroot().remove(cand.element)
+                                    except ValueError:
+                                        print("Could not remove %s" % cand.element.attrib["id"])
+                                    ignoreRel.add(j)
+                                    rel.includeArea(cand)
+                            
+            
     
 def removeRel(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
@@ -82,6 +154,7 @@ def removeRel(fileName,fileNameOut):
     for rel in osmFile.xpath("relation"):
         wrappedRelations.append(relationWrapper(rel))
     
+    simplifyRelations(osmFile,wrappedRelations)
     
     memberWays = set()
     for rel in osmFile.xpath("relation"):

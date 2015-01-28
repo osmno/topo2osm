@@ -4,15 +4,19 @@ Created on Nov 29, 2014
 @author: torsteinibo
 '''
 
-from lxml import etree
-from mergeroads import nodes2nodeList
+from lxml import etree as ET
 import sys
-import os
 import requests
 from riverTurner import reverseWay
 
+def nodes2nodeList(nodes):
+    l = {}
+    for n in nodes:
+        l[n.attrib['id']] = n
+    return l
+
 def openOsm(fileName):
-    return etree.parse(fileName)
+    return ET.parse(fileName)
 
 def hashNode(node):
     return "%.7f:%.7f" %(float(node.attrib["lat"]),float(node.attrib["lon"]))
@@ -107,7 +111,7 @@ def findOverlappingWay(overLapping,way,waysOsm):
                 bestMatchWay = w
     return bestMatchWay
 
-def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
+def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
     osmImport = openOsm(fileName)
     (nodes,nodesHashed,ways,waysHashed,relationsHashed) = hashOsm(osmImport)
     latMin = 1000.
@@ -130,7 +134,7 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
     #[waterway=stream|river]
     #print url+"[@meta]"
     res = requests.get(url)
-    oldOsm = etree.fromstring(res.content)
+    oldOsm = ET.fromstring(res.content)
     nodesOsm = nodes2nodeList(oldOsm.xpath("node"))
     waysOsm = nodes2nodeList(oldOsm.xpath("way"))
     new2osmNodes = dict()
@@ -142,6 +146,8 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
             except ValueError:
                 print("There is a duplicate node in OSM at position: %s %s, id: %s" %(nd.attrib["lon"],nd.attrib["lat"], nd.attrib["id"]))
     new2osmWays = dict()
+    includedNodes = set()
+    includedWays = set()
     for wayOsm in oldOsm.xpath("way"):
         if hashWay(wayOsm, nodesOsm) in waysHashed:
             newWay = waysHashed[hashWay(wayOsm, nodesOsm)]
@@ -164,20 +170,32 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
                 for t in newTags:
                     wayOsm.append(t)
                 if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
-                    reverseHashWay(wayOsm)
+                    reverseWay(wayOsm)
                 osmImport.getroot().append(wayOsm)
         else:
             shouldBeIncluded = False
+            fromN50 = False
             for tag in wayOsm.findall("tag"):
                 k = tag.attrib["k"]
                 v = tag.attrib["v"]
-                if ((k == "natural" and v == "water") or (k == "waterway")):
+                if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                    break
+                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                    shouldBeIncluded = True
+                if k=="source" and v=="Statkart N50":
+                    fromN50 = True
             if shouldBeIncluded:
-                wayOsm.append(etree.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
-                wayOsm.attrib["action"] = "modify"
+                if not fromN50:
+                    wayOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                    wayOsm.attrib["action"] = "modify"
                 osmImport.getroot().append(wayOsm)
+                includedWays.add(wayOsm.attrib["id"])
+                for nd in wayOsm.findall("nd"):
+                    ref = nd.attrib["ref"]
+                    if ref not in includedNodes:    
+                        includedNodes.add(ref)
+                        osmImport.getroot().append(nodesOsm[ref])
+            
     new2osmRel = dict()
     for relOsm in oldOsm.findall("relation"):  
         try:
@@ -185,22 +203,6 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
         except KeyError:
             hashStr = None
         if hashStr in relationsHashed:
-            #candRel = relationsHashed[hashRelation(relOsm, waysOsm, nodesOsm)]
-#             candMem = set()
-#             for cMem in candRel.findall("member"):
-#                 if (cMem.attrib["type"] == "node"):
-#                     candMem.add(hashNode(nodes[cMem.attrib["ref"]]))
-#                 else:
-#                     candMem.add(hashWay(ways[cMem.attrib["ref"]], nodes))
-#             equalRel = True
-#             for mem in relOsm.findall("member"):
-#                 if mem.attrib["type"] == "node" and (not hashNode(nodesOsm[mem.attrib["ref"]]) in candMem):
-#                     equalRel = False
-#                     break
-#                 elif mem.attrib["type"] == "way" and (not hashWay(waysOsm[mem.attrib["ref"]], nodesOsm) in candMem):
-#                     equalRel = False
-#                     break
-            #if equalRel:
             rel = relationsHashed[hashRelation(relOsm, waysOsm, nodesOsm)]
             new2osmRel[rel.attrib["id"]] = relOsm.attrib["id"]
             try:
@@ -209,32 +211,40 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
                 print("There is a duplicate relation with id: %s" %(relOsm.attrib["id"]))
         else:
             shouldBeIncluded = False
+            fromN50 = False
             for tag in relOsm.findall("tag"):
                 k = tag.attrib["k"]
                 v = tag.attrib["v"]
-                if ((k == "natural" and v == "water") or (k == "waterway")):
+                if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                    break
+                elif (importAreal and ((k == "natural" and v != "water")  or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                    shouldBeIncluded = True
+                if k=="source" and v=="Statkart N50":
+                    fromN50 = True
+                   
             if shouldBeIncluded:
-                relOsm.append(etree.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
-                relOsm.attrib["action"] = "modify"
+                if not fromN50:
+                    relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                    relOsm.attrib["action"] = "modify"
                 osmImport.getroot().append(relOsm)
+                for w in relOsm.findall("member"):
+                    wRef = w.attrib["ref"]
+                    if wRef not in includedWays and wRef in waysOsm:
+                        wayOsm = waysOsm[wRef]
+                        osmImport.getroot().append(wayOsm)
+                        includedWays.add(wRef)
+                        for nd in wayOsm.findall("nd"):
+                            ref = nd.attrib["ref"]
+                            if ref not in includedNodes:    
+                                includedNodes.add(ref)
+                                osmImport.getroot().append(nodesOsm[ref])
     
     for ref, way in ways.iteritems():
         if not ref in new2osmWays:
-#             nInOsm = 0
-#             nNodes = 0
             for nd in way.findall("nd"):
-#                 nNodes += 1
                 if nd.attrib["ref"] in new2osmNodes:
                     nd.attrib["ref"] = new2osmNodes[nd.attrib["ref"]]
-#                     nInOsm += 1
-#             if nInOsm/float(nNodes) > .9 or (nNodes>2 and nInOsm >= nNodes - 1) or (nNodes > 4 and nInOsm >= nNodes - 2) :
-#                 # Many of the nodes are in OSM already, the way is allready imported
-#                 w = findOverlappingWay(overLapping,way,waysOsm)
-#                 new2osmWays[ref] = w.attrib["id"]
-#                 osmImport.getroot().remove(way)
-#     
+     
     for rel in osmImport.xpath("relation"):
         for member in rel.findall("member"):
             if member.attrib["type"] == "way":
@@ -247,28 +257,29 @@ def replaceWithOsm(fileName,fileNameOut,overLapping=.8):
                 raise Warning("Type of member in relation unknown (id %d)" % rel.attrib["id"])
     
     osmImport.write(fileNameOut)
-    #(nodes,nodesHashed,ways,waysHashed,relationsHashed) = hashOsm(oldOsm)
 
 if __name__ == '__main__':
     fileName = None
-    if (len(sys.argv) == 2):
-        files = os.listdir(sys.argv[1])
-        for f in files:
-            if f.split(".")[-1] == "osm":
-                print("processing %s" % f)
-                fileName = os.path.join(sys.argv[1],f)
-                osmImport = openOsm(fileName)
-                
-                
-        
-    elif (len(sys.argv) != 3):
-        print("""The script requires two inputs:
+    if (len(sys.argv) < 3):
+        print("""The script requires at least two inputs:
 Usage:
-python replaceWithOsm.py inputFile outPutfile
+python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:areal] [--import:all] 
             
             """)
         exit()
     else:
         fileName = sys.argv[1]
         fileNameOut = sys.argv[2]
-        replaceWithOsm(fileName, fileNameOut)
+        importWater = False
+        importAreal = False
+        if (len(sys.argv) == 4):
+            imp = sys.argv[3]
+            if imp== "--import:water":
+                importWater = True
+            elif imp == "--import:areal":
+                importAreal = True
+            elif imp == "--import:all":
+                importAreal = True
+                importWater = True     
+        
+        replaceWithOsm(fileName, fileNameOut,importAreal,importWater)

@@ -11,8 +11,6 @@ for i, indent, tokens in tokens, info, 0 do
             out["natural"]="glacier"
         elseif tokens[2] == "FerskvannTørrfall" then
             out["natural"]="sand"
-        elseif tokens[2] == "InnsjøElvSperre" then
-            out["waterway"]="weir"
         elseif tokens[2] == "Skog" then
             out["natural"]="wood"
         elseif tokens[2] == "DyrketMark" then
@@ -65,8 +63,10 @@ for i, indent, tokens in tokens, info, 0 do
         out["ele"] = tokens[2]
     elseif tokens[1] == "OPPDATERINGSDATO" then
         out["source:date"] = tokens[2]
+        out["source"] = "statkart N50"
     elseif tokens[1] == "DATAFANGSTDATO" then
         out["source:date"] = tokens[2]
+        out["source"] = "statkart N50"
     elseif tokens[1] == "KVALITET" then
     
     elseif tokens[1] == "KURVE" or tokens[1] == "PUNKT" or  tokens[1] == "VATNLNR" then

@@ -1,4 +1,4 @@
-from lxml import etree
+import xml.etree.ElementTree as ET
 from math import sin, pi,fabs, sqrt
 import geographiclib.geodesic as gg
 import sys
@@ -228,16 +228,16 @@ class wayWrapper:
     
 def main():
     if len(sys.argv) is not 4:
-        print """The script requires three inputs, %d was given
+        print("""The script requires three inputs, %d was given
     Usage: python mergeroads new.osm old.osm output.osm
     - new.osm  Data to be merged into old.osm
     - old.osm Existing data, new ways should not be close to ways in old.osm
     - output.osm Output file
-    Input was: %s """  % (len(sys.argv)-1, str(sys.argv))
+    Input was: %s """  % (len(sys.argv)-1, str(sys.argv)))
         exit()
         
-    new = etree.parse(sys.argv[1])
-    old = etree.parse(sys.argv[2])
+    new = ET.parse(sys.argv[1])
+    old = ET.parse(sys.argv[2])
     
     newWays = new.findall("way")
     newNodes = nodes2nodeList(new.findall("node"))
