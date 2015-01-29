@@ -58,7 +58,7 @@ def removeRel(fileName,fileNameOut):
     for rel in relations:
         keep = False
         for tag in rel.findall("tag"):
-            if "k" in tag.attrib and not (tag.attrib["k"] == "source:date" or tag.attrib["k"] =="type" or tag.attrib["k"] =="ele") :
+            if "k" in tag.attrib and not (tag.attrib["k"] == "source:date" or tag.attrib["k"] == "source" or tag.attrib["k"] =="type" or tag.attrib["k"] =="ele") :
                 keep = True
                 break
         if keep:
@@ -94,7 +94,7 @@ def removeRel(fileName,fileNameOut):
         if not way.attrib["id"] in memberWays:  
             keep = False
             for tag in way.findall("tag"):
-                if "k" in tag.attrib and not (tag.attrib["k"] == "source:date" or tag.attrib["k"] =="type" or tag.attrib["k"] =="ele") :
+                if "k" in tag.attrib and not (tag.attrib["k"] == "source:date" or tag.attrib["k"] == "source" or tag.attrib["k"] =="type" or tag.attrib["k"] =="ele") :
                     keep = True
                     break
             if not keep:
