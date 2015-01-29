@@ -182,7 +182,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                     shouldBeIncluded = True
                 elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
                     shouldBeIncluded = True
-                if k=="source" and v=="Statkart N50":
+                if k=="source" and v=="statkart N50":
                     fromN50 = True
             if shouldBeIncluded:
                 if not fromN50:
@@ -219,7 +219,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                     shouldBeIncluded = True
                 elif (importAreal and ((k == "natural" and v != "water")  or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
                     shouldBeIncluded = True
-                if k=="source" and v=="Statkart N50":
+                if k=="source" and v=="statkart N50":
                     fromN50 = True
                    
             if shouldBeIncluded:
