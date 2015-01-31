@@ -31,6 +31,7 @@ class relationWrapper:
     findall = None
     remove = None
     append = None
+    nMem = None
     
     def __init__(self,element):
         self.element = element
@@ -39,7 +40,9 @@ class relationWrapper:
         self.remove = element.remove
         self.append = element.append
         self.outerWays = set()
-        for way in element.findall("member"):
+        members = element.findall("member")
+        self.nMem = len(members)
+        for way in members:
             if way.attrib["type"] == "way" and way.attrib["role"] == "outer":
                 #self.includeArea(ways[way.attrib["ref"]])
                 self.outerWays.add(way.attrib["ref"])
@@ -98,11 +101,13 @@ def simplifyRelations(osmFile,relations):
             i = -1
             for rel in multipolygons:
                 i += 1
-                if (not i in ignoreRel) and (int(rel.attrib["id"])<0):
+                if (not i in ignoreRel) and (int(rel.attrib["id"])<0) and len(rel.findall("member"))<20:
                     for j in range(0,len(multipolygons)):            
                         if i != j and (not j in ignoreRel):
                             cand = multipolygons[j]
-                            if int(cand.attrib["id"])<0:
+                            cNMem = len(cand.findall("member"))
+                            rNMem = len(rel.findall("member"))
+                            if int(cand.attrib["id"])<0 and (rNMem + cNMem<100 or rNMem<15):
                                 equalOuter = rel.outerWays & cand.outerWays
                                 if len(equalOuter)>0:
                                     #hasMerged = True
