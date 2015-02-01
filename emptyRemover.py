@@ -105,7 +105,8 @@ def removeRel(fileName,fileNameOut):
     
     for nd in osmFile.xpath("node"):
         if not int(nd.attrib["id"]) in keepNodes:
-            osmFile.getroot().remove(nd)
+            if len(nd.findall("tag")) == 0:
+                osmFile.getroot().remove(nd)
             
     
     

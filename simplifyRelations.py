@@ -5,7 +5,7 @@ Created on Nov 29, 2014
 '''
 
 from lxml import etree
-from mergeroads import nodes2nodeList
+from nodes2nodeList import nodes2nodeList
 import sys
 import os
 
