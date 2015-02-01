@@ -63,7 +63,7 @@ def removeRel(fileName,fileNameOut):
                 break
         if keep:
             members = rel.findall("member")
-            if len(members) == 1 and members[0].attrib["ref"] < 0:
+            if len(members) == 1 and int(members[0].attrib["ref"]) < 0:
                 member = members[0]
                 if (member.attrib["type"] == "way"):
                     member = ways[member.attrib["ref"]]

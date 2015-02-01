@@ -15,9 +15,9 @@ for i, indent, tokens in tokens, info, 0 do
         elseif tokens[2] == "Havflate" then
             return {}
         elseif tokens[2] == "HavElvSperre" then
-            out["natural"] = "coastline"
+            return {}
         elseif tokens[2] == "Kystkontur" then
-            out["natural"] = "coastline"
+            return {}
         else
 
 		end
@@ -26,8 +26,9 @@ for i, indent, tokens in tokens, info, 0 do
     elseif tokens[1] == "VANNBR" then
         out["width"] = tokens[2]
     elseif tokens[1] == "OPPDATERINGSDATO" then
-        out["source:date"] = tokens[2]
-        out["source"] = "statkart N50"
+        v = tokens[2]
+        out["source:date"] = string.format("%s-%s-%s",string.sub(v,1,4),string.sub(v,5,6),string.sub(v,7,8))
+        out["source"] = "Kartverket N50"
     elseif tokens[1] == "DATAFANGSTDATO" then
         out["source:date"] = tokens[2]
         out["source"] = "statkart N50"
