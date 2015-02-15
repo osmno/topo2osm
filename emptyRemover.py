@@ -49,8 +49,8 @@ class relationWrapper:
         for w in element.outerWays:
             self.outerWays.add(w)
     
-def removeRel(fileName,fileNameOut):
-    osmFile = etree.parse(fileName)
+def emptyRemover(osmFile):
+    
     
     relations = osmFile.xpath("relation")
     ways = nodes2nodeList(osmFile.xpath("way"))
@@ -63,7 +63,7 @@ def removeRel(fileName,fileNameOut):
                 break
         if keep:
             members = rel.findall("member")
-            if len(members) == 1 and int(members[0].attrib["ref"]) < 0:
+            if len(members) == 1:
                 member = members[0]
                 if (member.attrib["type"] == "way"):
                     member = ways[member.attrib["ref"]]
@@ -73,8 +73,15 @@ def removeRel(fileName,fileNameOut):
                     raise ValueError("Unknown type of only member in relation %s" % rel.attrib["id"])
                 for tag in rel.findall("tag"):
                     if "k" in tag.attrib and not (tag.attrib["k"] =="type") :
-                        member.append(tag)
-                osmFile.getroot().remove(rel)
+                        member.insert(0,tag)
+                        
+                if (int(member.attrib["id"])>0):
+                    member.attrib["action"] = "modify"
+                
+                if (int(rel.attrib["id"])>0):
+                    rel.attrib["action"] = "delete"
+                else:
+                    osmFile.getroot().remove(rel)
         else:
             osmFile.getroot().remove(rel)
     
@@ -105,12 +112,17 @@ def removeRel(fileName,fileNameOut):
     
     for nd in osmFile.xpath("node"):
         if not int(nd.attrib["id"]) in keepNodes:
-            if len(nd.findall("tag")) == 0:
+            keep = False
+            if len(nd.findall("tag")) > 0:
+                for tag in nd.findall("tag"):
+                    if "k" in tag.attrib and not (tag.attrib["k"] == "source:date" or tag.attrib["k"] == "source" or tag.attrib["k"] =="type" or tag.attrib["k"] =="ele") :
+                        keep = True
+                        break
+            if not keep:
                 osmFile.getroot().remove(nd)
-            
+
+    return osmFile
     
-    
-    osmFile.write(fileNameOut)
 
 
 if __name__ == '__main__':
@@ -134,4 +146,6 @@ python riverTurner.py inputFile outPutfile
     else:
         fileName = sys.argv[1]
         fileNameOut = sys.argv[2]
-        removeRel(fileName, fileNameOut)
+        osmFile = etree.parse(fileName)
+        osmFile = emptyRemover(osmFile)
+        osmFile.write(fileNameOut)

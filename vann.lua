@@ -51,6 +51,7 @@ if out["width"] == nil then
 else
     if out["width"] == "4" or out["width"] == "5" then
         out["waterway"]="riverbank"
+        out["Fixme"]="Add waterway in middle of way to indicate direction of river"
     end
     out["width"] = nil
 end

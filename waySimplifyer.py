@@ -8,7 +8,7 @@ from lxml import etree
 from mergeroads import nodes2nodeList
 from misc import equalTags, combineWays, reLinkRef
 import sys
-import os
+
 
 # Class for wrapping and combining ways
 # class wayWrapper:
@@ -63,10 +63,7 @@ def simplifyWay(fileName,fileNameOut):
                             reLinkRef(waysToRelation[candRef],relations,candRef)
                         startNodeToWay[endNode].remove(candRef)
                         endNode = w.findall("nd")[-1].attrib["ref"]
-                        assert(endNode in endNodeToWay)
-                        assert(candRef in endNodeToWay[endNode])
                         endNodeToWay[endNode].remove(candRef)
-                        assert(candRef not in endNodeToWay[endNode])
                         ways[candRef] = None
                         break
             if endNode not in endNodeToWay:

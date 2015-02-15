@@ -182,7 +182,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                     shouldBeIncluded = True
                 elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
                     shouldBeIncluded = True
-                if k=="source" and v=="statkart N50":
+                if k=="source" and v=="Kartverket N50":
                     fromN50 = True
             if shouldBeIncluded:
                 if not fromN50:
@@ -211,19 +211,22 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                 print("There is a duplicate relation with id: %s" %(relOsm.attrib["id"]))
         else:
             shouldBeIncluded = False
-            fromN50 = False
-            for tag in relOsm.findall("tag"):
-                k = tag.attrib["k"]
-                v = tag.attrib["v"]
-                if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
-                    shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water")  or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
-                    shouldBeIncluded = True
-                if k=="source" and v=="statkart N50":
-                    fromN50 = True
+            relFromN50 = True
+            for mem in relOsm.findall("mem"):
+                memRef = mem.attrib["ref"]
+                if memRef in waysOsm:
+                    fromN50 = False
+                    for tag in waysOsm[memRef].findall("tag"):
+                        k = tag.attrib["k"]
+                        v = tag.attrib["v"]
+                        if k=="source" and v=="Kartverket N50":
+                            fromN50 = True
+                    if not fromN50:
+                        relFromN50 = False
+                        break
                    
             if shouldBeIncluded:
-                if not fromN50:
+                if not relFromN50:
                     relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
                     relOsm.attrib["action"] = "modify"
                 osmImport.getroot().append(relOsm)

@@ -25,13 +25,21 @@ def equalTags(ref1,ref2):
     return nTags == len(tags)
 
 def combineWays(fileroot,target,copy):
+    if(int(copy.attrib["id"])>0):
+        assert(copy.attrib["id"]>0)
     first = True
     for nd in copy.findall("nd"):
         if first:
             first = False
         else:
             target.append(nd)
-    fileroot.remove(copy)
+    if(int(copy.attrib["id"])<0):
+        fileroot.remove(copy)
+    else:
+        copy.attrib["action"]="delete"
+    
+    if(int(target.attrib["id"])>0):
+        target.attrib["action"]="modify"
     
 def reLinkRef(relRefs,relations,oldref):
     for ref in relRefs:
