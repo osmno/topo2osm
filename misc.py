@@ -47,3 +47,11 @@ def reLinkRef(relRefs,relations,oldref):
         mem = rel.findall("member[@ref='%s']" % oldref)
         assert(len(mem)==1)
         rel.remove(mem[0])
+
+def reverseWay(way,nd=None):
+    if nd is None:
+        nd = way.findall("nd")
+    for n in nd:
+        way.remove(n)
+    for i in range(len(nd)-1,-1,-1):
+        way.append(nd[i])

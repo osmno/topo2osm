@@ -7,7 +7,7 @@ Created on Nov 29, 2014
 from lxml import etree as ET
 import sys
 import requests
-from riverTurner import reverseWay
+from misc import reverseWay
 
 def nodes2nodeList(nodes):
     l = {}
