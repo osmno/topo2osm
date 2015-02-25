@@ -27,7 +27,6 @@ import sys
 #             self.bBoxE = max(self.bBoxE,lon)
             
 
-    
 def simplifyWay(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     
