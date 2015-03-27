@@ -26,14 +26,14 @@ def hashWay(way,nodes):
     hashStr = ""
     for nd in way.findall("nd"):
         hashStr = "%s:%s" % (hashStr, hashNode(nodes[nd.attrib["ref"]]))
-    return hashStr
+    return hashStr[1:]
 
 def reverseHashWay(way,nodes):
     nd = way.findall("nd")
     hashStr = ""
     for nd in way.findall("nd"):
         hashStr = "%s:%s" % (hashNode(nodes[nd.attrib["ref"]]),hashStr)
-    return hashStr
+    return hashStr[:-1]
 
 def hashRelation(relation,ways,nodes):
     hashStr = ""
@@ -111,7 +111,7 @@ def findOverlappingWay(overLapping,way,waysOsm):
                 bestMatchWay = w
     return bestMatchWay
 
-def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
+def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLapping=.8):
     osmImport = openOsm(fileName)
     (nodes,nodesHashed,ways,waysHashed,relationsHashed) = hashOsm(osmImport)
     latMin = 1000.
@@ -129,10 +129,14 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
             latMax = lat
         if lon > lonMax:
             lonMax = lon
-
-    url = "http://www.overpass-api.de/api/xapi?*[bbox=%f,%f,%f,%f][@meta]" % (lonMin,latMin,lonMax,latMax)
+    
+    bbox = "%f,%f,%f,%f" %(lonMin,latMin,lonMax,latMax)
+    url = "http://www.overpass-api.de/api/xapi?*[bbox=%s][@meta]" % bbox
     #[waterway=stream|river]
-    #print url+"[@meta]"
+    if importWay:
+        bbox = "%f,%f,%f,%f" %(latMin,lonMin,latMax,lonMax)
+        url = 'http://overpass-api.de/api/interpreter?data=(way(%s)["highway"];node(%s)["barrier"];);(._;>;);out meta;' % (bbox,bbox)
+        print url
     res = requests.get(url)
     oldOsm = ET.fromstring(res.content)
     nodesOsm = nodes2nodeList(oldOsm.xpath("node"))
@@ -169,9 +173,9 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                 wayOsm.attrib["action"] = "modify"
                 for t in newTags:
                     wayOsm.append(t)
-                if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
-                    reverseWay(wayOsm)
-                osmImport.getroot().append(wayOsm)
+            if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
+                reverseWay(wayOsm)
+            osmImport.getroot().append(wayOsm)
         else:
             shouldBeIncluded = False
             fromN50 = False
@@ -181,6 +185,8 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
                 elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                    shouldBeIncluded = True
+                elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
                 if k=="source" and v=="Kartverket N50":
                     fromN50 = True
@@ -210,21 +216,25 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,overLapping=.8):
             except KeyError:
                 print("There is a duplicate relation with id: %s" %(relOsm.attrib["id"]))
         else:
-            shouldBeIncluded = False
-            relFromN50 = True
+            
+            relFromN50 = False
             for mem in relOsm.findall("mem"):
                 memRef = mem.attrib["ref"]
                 if memRef in waysOsm:
-                    fromN50 = False
                     for tag in waysOsm[memRef].findall("tag"):
                         k = tag.attrib["k"]
                         v = tag.attrib["v"]
                         if k=="source" and v=="Kartverket N50":
-                            fromN50 = True
-                    if not fromN50:
-                        relFromN50 = False
-                        break
-                   
+                            relFromN50 = True
+            shouldBeIncluded = False
+            for tag in relOsm.findall("tag"):
+                k = tag.attrib["k"]
+                v = tag.attrib["v"]
+                if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
+                    shouldBeIncluded = True
+                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                    shouldBeIncluded = True
+        
             if shouldBeIncluded:
                 if not relFromN50:
                     relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
@@ -275,14 +285,18 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:areal] 
         fileNameOut = sys.argv[2]
         importWater = False
         importAreal = False
+        importWay = False
         if (len(sys.argv) == 4):
             imp = sys.argv[3]
             if imp== "--import:water":
                 importWater = True
             elif imp == "--import:areal":
                 importAreal = True
+            elif imp == "--import:way":
+                importWay = True
             elif imp == "--import:all":
                 importAreal = True
-                importWater = True     
+                importWater = True
+                importWay = True
         
-        replaceWithOsm(fileName, fileNameOut,importAreal,importWater)
+        replaceWithOsm(fileName, fileNameOut,importAreal,importWater,importWay)
