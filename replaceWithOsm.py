@@ -269,6 +269,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             else:
                 raise Warning("Type of member in relation unknown (id %d)" % rel.attrib["id"])
     
+    osmImport.getroot().attrib["upload"] = "True"
     osmImport.write(fileNameOut)
 
 if __name__ == '__main__':
