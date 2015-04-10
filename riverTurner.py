@@ -115,7 +115,6 @@ def checkDirection(way,ways,endNodes,decidedWays):
                     pass
                 checkDirection(w, ways, endNodes,decidedWays)
     
-@profile
 def turnTivers(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     

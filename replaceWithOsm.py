@@ -277,7 +277,7 @@ if __name__ == '__main__':
     if (len(sys.argv) < 3):
         print("""The script requires at least two inputs:
 Usage:
-python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:areal] [--import:all] 
+python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [--import:all]
             
             """)
         exit()
@@ -293,11 +293,21 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:areal] 
                 importWater = True
             elif imp == "--import:areal":
                 importAreal = True
+            elif imp == "--import:area":
+                importAreal = True
             elif imp == "--import:way":
                 importWay = True
             elif imp == "--import:all":
                 importAreal = True
                 importWater = True
                 importWay = True
+            else:
+                print("""The script requires at least two inputs:
+Usage:
+python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [--import:all]
+                    
+Unknown flag: %s """ % imp)
+                exit()
+
         
         replaceWithOsm(fileName, fileNameOut,importAreal,importWater,importWay)
