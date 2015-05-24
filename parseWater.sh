@@ -13,6 +13,7 @@ sosi2osm "${id}_N50_Arealdekke.sos" vann.lua ${id}.osm
 python riverTurner.py ${id}.osm ${id}.osm
 python waySimplifyer.py ${id}.osm ${id}.osm
 python emptyRemover.py ${id}.osm ${id}.osm
+python removeExcessiveNodes.py ${id}.osm ${id}.osm .1
 python splitterOsm.py ${id}.osm ${id}_part
 zip -q "/Users/torsteinibo/Google Drive/TopoImportVann/${id}_${name}_vann.zip" ${id}*.osm
 rm ${id}.osm

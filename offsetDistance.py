@@ -42,14 +42,17 @@ def getOffsetDistance(trippleNodes,nodeList):
     nd1 = nodeList[trippleNodes[1].attrib["ref"]]
     nd2 = nodeList[trippleNodes[2].attrib["ref"]]
     (dl,dx,dy) = distCalc.latLonDistanceNodes(nd0,nd2)
-    dx /= dl
-    dy /= dl
-    co = dx
-    si = dy
-    (_,dx,dy) = distCalc.latLonDistanceNodes(nd0,nd1)
-    
-    
-    return dx*si-dy*co
+    if dl == 0:
+        return 0.
+    else:
+        dx /= dl
+        dy /= dl
+        co = dx
+        si = dy
+        (_,dx,dy) = distCalc.latLonDistanceNodes(nd0,nd1)
+        
+        
+        return dx*si-dy*co
 
 def openOsm(fileName):
     return ET.parse(fileName)
