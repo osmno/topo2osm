@@ -47,7 +47,18 @@ def simplifyWay(fileName,fileNameOut):
         nd = w.findall("nd")
         startNode = nd[0].attrib["ref"]
         endNode = nd[-1].attrib["ref"]
-        if startNode != endNode:
+        
+        # Check if way has FIXME="Check direction of river/stream"
+        ignore = False
+        for t in w.findall("tag"):
+            k = t.attrib["k"]
+            v = t.attrib["v"]
+            if (k == "FIXME" and v == "Check direction of river/stream"):
+                ignore = True
+                break
+        
+        
+        if startNode != endNode and not ignore:
             if endNode in startNodeToWay:
                 for candRef in startNodeToWay[endNode]:
                     tagsEqual = equalTags(ways[candRef],ways[ref])
