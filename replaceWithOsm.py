@@ -218,7 +218,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
-                if k=="source" and v=="Kartverket N50":
+                if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
                     fromN50 = True
             if shouldBeIncluded:
                 if not fromN50:
@@ -247,15 +247,15 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 print("There is a duplicate relation with id: %s" %(relOsm.attrib["id"]))
         else:
             
-            relFromN50 = True
+            relFromN50 = False
             for mem in relOsm.findall("mem"):
                 memRef = mem.attrib["ref"]
                 if memRef in waysOsm:
                     for tag in waysOsm[memRef].findall("tag"):
                         k = tag.attrib["k"]
                         v = tag.attrib["v"]
-                        if k=="source" and v !="Kartverket N50":
-                            relFromN50 = False
+                        if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
+                            relFromN50 = True
             shouldBeIncluded = False
             for tag in relOsm.findall("tag"):
                 k = tag.attrib["k"]
