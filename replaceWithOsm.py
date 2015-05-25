@@ -42,6 +42,18 @@ def hashRelation(relation,ways,nodes):
         hashStr = "%s:%s" % (hashStr,hashWay(ways[memb.attrib["ref"]], nodes))
     return hashStr
 
+def hasConflictingTags(fromE,toE):
+    tags = set()
+    for tag in fromE.findall("tag"):
+        if "k" in tag.attrib and not (tag.attrib["k"] == "source:date") :
+            tags.add(tag.attrib["k"])
+
+    for tag in toE.findall("tag"):
+        if "k" in tag.attrib and tag.attrib["k"] in tags:
+            return True
+
+    return False
+
 def copyTags(fromE,toE):
     for tag in fromE.findall("tag"):
         if "k" in tag.attrib and not (tag.attrib["k"] == "source:date") :
@@ -130,6 +142,11 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             latMax = lat
         if lon > lonMax:
             lonMax = lon
+            
+    minRelationId = -1;
+    for _,rel in relationsHashed.iteritems():
+        minRelationId = min(minRelationId,int(rel.attrib['id']))
+        
     
     bbox = "%f,%f,%f,%f" %(lonMin,latMin,lonMax,latMax)
     url = "http://www.overpass-api.de/api/xapi?*[bbox=%s][@meta]" % bbox
@@ -158,25 +175,37 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             newWay = waysHashed[hashWay(wayOsm, nodesOsm)]
             new2osmWays[newWay.attrib["id"]] = wayOsm.attrib["id"]
             #check if tags are equal
-            oldTag = set()
-            for t in wayOsm.findall("tag"):
-                oldTag.add(t.attrib["k"]+t.attrib["v"])
-            newTags = set()
-            for t in newWay.findall("tag"):
-                if (t.attrib["k"] != "source:date" and (t.attrib["k"]+t.attrib["v"]) not in oldTag):
-                    newTags.add(t)           
+            if hasConflictingTags(newWay, wayOsm):
+                # Make relation and make reference to other 
+                minRelationId -= 1
+                rel = ET.Element("relation", {'id':'%d' % minRelationId, 'visible':'true'} )
+                rel.append(ET.Element("member", {'type':'way', 'role':'outer', 'ref':wayOsm.attrib["id"]} ))
+                rel.append(ET.Element("tag", {'k':'type', 'v':'multipolygon'} ))
+                for t in newWay.findall("tag"):
+                    if (t.attrib["k"] != "source:date" and t.attrib["k"] != "source"):
+                        rel.append(t)  
+                osmImport.getroot().append(rel)
+            else:
+                oldTag = set()
+                for t in wayOsm.findall("tag"):
+                    oldTag.add(t.attrib["k"]+t.attrib["v"])
+                newTags = set()
+                for t in newWay.findall("tag"):
+                    if (t.attrib["k"] != "source:date" and (t.attrib["k"]+t.attrib["v"]) not in oldTag):
+                        newTags.add(t)           
+
+                    
+                if (len(newTags) > 0):
+                    wayOsm.attrib["action"] = "modify"
+                    for t in newTags:
+                        wayOsm.append(t)
+                if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
+                    reverseWay(wayOsm)
+                osmImport.getroot().append(wayOsm)
             try:
                 osmImport.getroot().remove(newWay)
             except ValueError:
                 print("There is a duplicate way with id: %s" %(wayOsm.attrib["id"]))
-                
-            if (len(newTags) > 0):
-                wayOsm.attrib["action"] = "modify"
-                for t in newTags:
-                    wayOsm.append(t)
-            if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
-                reverseWay(wayOsm)
-            osmImport.getroot().append(wayOsm)
         else:
             shouldBeIncluded = False
             fromN50 = False
