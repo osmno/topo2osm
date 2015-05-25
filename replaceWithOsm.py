@@ -80,12 +80,14 @@ def hashOsm(osmFile):
             if ref in newNode:
                 nd.attrib["ref"] =  newNode[ref]
         ref = hashWay(way,nodes)
+        if len(ref) == 0:
+            raise ValueError("There is an empty way with id: %s. Remove this way and try again." % way.attrib['id'])
         if ref in waysHashed:
-            raise ValueError("Two ways have same hash: %s" % ref)
+            raise ValueError("Two ways have the same nodes. Remove duplicates and try again. The ids are: %s and %s. The nodes are: %s" % (way.attrib['id'], waysHashed[ref].attrib['id'],ref))
         waysHashed[ref] = way
         ref = reverseHashWay(way,nodes)
         if ref in waysHashed:
-            raise ValueError("Two ways have same hash: %s" % ref)
+            raise ValueError("Two ways have the same nodes. Remove duplicates and try again. The ids are: %s and %s. The nodes are: %s" % (way.attrib['id'], waysHashed[ref].attrib['id'],ref))
         waysHashed[ref] = way
         
         
