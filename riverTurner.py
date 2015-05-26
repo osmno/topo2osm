@@ -31,19 +31,24 @@ def reverseWay(way,nd=None):
 class NodeStatus:
     def __init__(self):
         self.lowNodes = set()
-        self.heighNodes = set()
+        self.highNodes = set()
         self.unknownNodes = set()
         
     def addLowNode(self,ref):
         self.lowNodes.add(ref)
         
-    def addHeighNode(self,ref):
-        self.heighNodes.add(ref)
+    def addHighNode(self,ref):
+        self.highNodes.add(ref)
         
     def addUnknownNode(self,ref):
         self.unknownNodes.add(ref)
+        
+    def copy(self,copy):
+        self.lowNodes = self.lowNodes.union(copy.lowNodes)
+        self.highNodes = self.highNodes.union(copy.highNodes)
+        self.unknownNodes = self.unknownNodes.union(copy.unknownNodes)
     
-    # Returns 1 if ref is the heighest (inlet)
+    # Returns 1 if ref is the highest (inlet)
     # Returns 0 if unknown
     # Returns -1 if ref is the lowest (outlet)    
     def decideDirection(self,ref):
@@ -51,9 +56,9 @@ class NodeStatus:
             return 0
         if not ref in self.unknownNodes:
             return 0
-        if len(self.heighNodes) > 0 and len(self.lowNodes) > 0:
+        if len(self.highNodes) > 0 and len(self.lowNodes) > 0:
             return 0
-        if len(self.heighNodes) > 0:
+        if len(self.highNodes) > 0:
             return -1
         if len(self.lowNodes) > 0:
             return 1
@@ -62,36 +67,60 @@ class NodeStatus:
     def moveUnknownToHigh(self,ref):
         if ref in self.unknownNodes:
             self.unknownNodes.remove(ref)
-            self.addHeighNode(ref)
+            self.addHighNode(ref)
         
     def moveUnknownToLow(self,ref):
         if ref in self.unknownNodes:
             self.unknownNodes.remove(ref)
             self.addLowNode(ref)
+
+class EndNodes:
+    store = None
+    def __init__(self):
+        self.store = dict()
+    def setEndNodesHighLow(self,wayRef,highRef,lowRef):
+        if not highRef in self.store:
+            self.store[highRef] = NodeStatus()
+        self.store[highRef].addHighNode(wayRef)
         
-def setEndNodesHighLow(wayRef,highRef,lowRef,endNodes):
-    if not highRef in endNodes:
-        endNodes[highRef] = NodeStatus()
-    endNodes[highRef].addHeighNode(wayRef)
+        if not lowRef in self.store:
+            self.store[lowRef] = NodeStatus()
+        self.store[lowRef].addLowNode(wayRef)
     
-    if not lowRef in endNodes:
-        endNodes[lowRef] = NodeStatus()
-    endNodes[lowRef].addLowNode(wayRef)
+    def setEndNodesUnknown(self,wayRef,nodeRef1,nodeRef2):
+        if not nodeRef1 in self.store:
+            self.store[nodeRef1] = NodeStatus()
+        if not nodeRef2 in self.store:
+            self.store[nodeRef2] = NodeStatus()
+        self.store[nodeRef1].addUnknownNode(wayRef)
+        self.store[nodeRef2].addUnknownNode(wayRef)
+        
+    def __setitem__(self, k, v):
+        self.store[k] = v
     
-def setEndNodesUnknown(wayRef,nodeRef1,nodeRef2,endNodes):
-    if not nodeRef1 in endNodes:
-        endNodes[nodeRef1] = NodeStatus()
-    if not nodeRef2 in endNodes:
-        endNodes[nodeRef2] = NodeStatus()
-    endNodes[nodeRef1].addUnknownNode(wayRef)
-    endNodes[nodeRef2].addUnknownNode(wayRef)
+    def __getitem__(self,k):
+        return self.store[k]
     
-def checkDirection(way,ways,endNodes,decidedWays):
+    def __delitem__(self,k):
+        del self.store[k]
+        
+    def __contains__(self,k):
+        return k in self.store
+    
+def checkDirection(way,ways,endNodes,decidedWays,nodesToCircularWay):
     nd = ways[way].findall("nd")
     nd0 = nd[0].attrib["ref"]
     ndEnd = nd[-1].attrib["ref"]
+    if nd0 in nodesToCircularWay:
+        nd0 = nodesToCircularWay[nd0]
+
     dir0 = endNodes[nd0].decideDirection(way)
+        
+    if ndEnd in nodesToCircularWay:
+        ndEnd = nodesToCircularWay[ndEnd]
+    
     dirEnd = endNodes[ndEnd].decideDirection(way)
+        
     if fabs(dir0+dirEnd) == 2:
         ways[way].append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, conflicting directions'} ))
         print("Conflicting directions for way: %s" % way)
@@ -108,20 +137,21 @@ def checkDirection(way,ways,endNodes,decidedWays):
             if(len(endNodes[nd0].unknownNodes) == 1):
                 for w in endNodes[nd0].unknownNodes:
                     pass
-                checkDirection(w, ways, endNodes,decidedWays)
+                checkDirection(w, ways, endNodes,decidedWays,nodesToCircularWay)
         if dirEnd == 0:
             if(len(endNodes[ndEnd].unknownNodes) == 1):
                 for w in endNodes[ndEnd].unknownNodes:
                     pass
-                checkDirection(w, ways, endNodes,decidedWays)
+                checkDirection(w, ways, endNodes,decidedWays,nodesToCircularWay)
     
-def turnTivers(fileName,fileNameOut):
+def turnRivers(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     
     ways = osmFile.xpath("way")
     nodes = nodes2nodeList(osmFile.findall("node"))
-    endNodes = dict()
+    endNodes = EndNodes()
     wayUnknownDir = set()
+    wayCircular = set()
     for way in ways:
         for tag in way.findall("tag"):
             if "k" in tag.attrib and tag.attrib["k"] == "waterway" and (tag.attrib["v"] == "river" or tag.attrib["v"] == "stream"):
@@ -133,23 +163,46 @@ def turnTivers(fileName,fileNameOut):
                         if (fabs(h1-h2)>2):
                             if (h1 < h2):
                                 reverseWay(way, nd)
-                                setEndNodesHighLow(way.attrib["id"], nd[-1].attrib["ref"], nd[0].attrib["ref"], endNodes)
+                                endNodes.setEndNodesHighLow(way.attrib["id"], nd[-1].attrib["ref"], nd[0].attrib["ref"])
                             else:
-                                setEndNodesHighLow(way.attrib["id"], nd[0].attrib["ref"], nd[-1].attrib["ref"], endNodes)
+                                endNodes.setEndNodesHighLow(way.attrib["id"], nd[0].attrib["ref"], nd[-1].attrib["ref"])
                         if (fabs(h1-h2)<2):
-                            setEndNodesUnknown(way.attrib["id"], nd[0].attrib["ref"], nd[-1].attrib["ref"], endNodes)
+                            endNodes.setEndNodesUnknown(way.attrib["id"], nd[0].attrib["ref"], nd[-1].attrib["ref"])
                             wayUnknownDir.add(way.attrib["id"])
                             #way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, elevation difference is %.1f' % int(h1-h2)} ))
                     except IndexError as e:
                         print(e)
                         #way.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of river/stream, could not check elevation difference'} ))
-                        setEndNodesUnknown(way.attrib["id"], h1.attrib["ref"], h2.attrib["ref"], endNodes)
+                        endNodes.setEndNodesUnknown(way.attrib["id"], h1.attrib["ref"], h2.attrib["ref"])
                         wayUnknownDir.add(way.attrib["id"])
+                else:
+                    wayCircular.add(way.attrib["id"])
+                    
+                    
+
+    
     
     ways = nodes2nodeList(ways)
+    
+    nodesToCircularWay = dict()
+    for rel in osmFile.xpath("relation"):
+        ref = rel.attrib["id"]+"r"
+        ndStatus = NodeStatus()
+        for way in rel.findall("member"):
+            for nd in ways[way.attrib["ref"]].findall("nd"):
+                ndRef = nd.attrib["ref"]
+                if ndRef in endNodes:
+                    ndStatus.copy(endNodes[ndRef])
+                    del endNodes[ndRef]
+                    nodesToCircularWay[ndRef] = ref
+        endNodes[ref] = ndStatus
+         
+    
+                
+    
     decidedWays = set()
     for way in wayUnknownDir:
-        checkDirection(way,ways,endNodes,decidedWays)
+        checkDirection(way,ways,endNodes,decidedWays,nodesToCircularWay)
     
     for way in wayUnknownDir:
         if not way in decidedWays:
@@ -166,7 +219,7 @@ if __name__ == '__main__':
             if f.split(".")[-1] == "osm":
                 print("processing %s" % f)
                 fileName = os.path.join(sys.argv[1],f)
-                turnTivers(fileName,fileName)
+                turnRivers(fileName,fileName)
                 
         
     elif (len(sys.argv) != 3):
@@ -179,4 +232,4 @@ python riverTurner.py inputFile outPutfile
     else:
         fileName = sys.argv[1]
         fileNameOut = sys.argv[2]
-        turnTivers(fileName, fileNameOut)
+        turnRivers(fileName, fileNameOut)
