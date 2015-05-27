@@ -43,13 +43,13 @@ def hashRelation(relation,ways,nodes):
     return hashStr
 
 def hasConflictingTags(fromE,toE):
-    tags = set()
+    tags = dict()
     for tag in fromE.findall("tag"):
-        if "k" in tag.attrib and not (tag.attrib["k"] == "source:date") :
-            tags.add(tag.attrib["k"])
+        if (tag.attrib["k"] != "source:date") :
+            tags[tag.attrib["k"]] = tag.attrib["v"]
 
     for tag in toE.findall("tag"):
-        if "k" in tag.attrib and tag.attrib["k"] in tags:
+        if tag.attrib["k"] in tags and tags[tag.attrib["k"]] != tag.attrib["v"]:
             return True
 
     return False
