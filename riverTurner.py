@@ -186,16 +186,22 @@ def turnRivers(fileName,fileNameOut):
     
     nodesToCircularWay = dict()
     for rel in osmFile.xpath("relation"):
-        ref = rel.attrib["id"]+"r"
-        ndStatus = NodeStatus()
-        for way in rel.findall("member"):
-            for nd in ways[way.attrib["ref"]].findall("nd"):
-                ndRef = nd.attrib["ref"]
-                if ndRef in endNodes:
-                    ndStatus.copy(endNodes[ndRef])
-                    del endNodes[ndRef]
-                    nodesToCircularWay[ndRef] = ref
-        endNodes[ref] = ndStatus
+        isWater = False
+        for tag in rel.findall("tag"):
+            if tag.attrib["k"] == "waterway" or (tag.attrib["k"] == "natural" and tag.attrib["v"] == "water"):
+                isWater = True
+        if isWater:
+            ref = rel.attrib["id"]+"r"
+            ndStatus = NodeStatus()
+            for way in rel.findall("member"):
+                if way.attrib["role"] == "outer":
+                    for nd in ways[way.attrib["ref"]].findall("nd"):
+                        ndRef = nd.attrib["ref"]
+                        if ndRef in endNodes:
+                            ndStatus.copy(endNodes[ndRef])
+                            del endNodes[ndRef]
+                            nodesToCircularWay[ndRef] = ref
+            endNodes[ref] = ndStatus
          
     
                 
