@@ -48,7 +48,9 @@ end
 if out["width"] == nil then
 else
     if out["width"] == "4" or out["width"] == "5" then
-        out["waterway"]="riverbank"
+        out["waterway"]=nil
+        out["natural"]="water"
+	out["water"] = "river"
         out["FIXME"]="Add waterway in middle of way to indicate direction of river and connect side rivers/streams to it."
     end
     out["width"] = nil

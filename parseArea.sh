@@ -1,8 +1,8 @@
 #!/bin/bash
 
 file="$1"
-id=$(echo $file | grep -o '[1-2]*\d\d\d')
-name=$(echo $file | grep -o '[a-zæøåA-ZÆØÅ]*_UTM\d\d');
+id=$(echo $file | grep -o '[0-9]\{3,4\}')
+name=$(echo $file | grep -o '[a-zæøåA-ZÆØÅ]*_UTM33');
 if [ ${#id} -lt 4 ]
   then 
     id="0$id";
@@ -15,7 +15,7 @@ python emptyRemover.py ${id}.osm ${id}.osm
 python removeExcessiveNodes.py ${id}.osm ${id}.osm .1
 python simplifyRelations.py  ${id}.osm ${id}.osm
 python splitterOsm.py ${id}.osm ${id}_part
-zip -q "/Users/torsteinibo/Google Drive/TopoImportAreal/${id}_${name}_areal.zip" ${id}*.osm
+zip -q "/home/torstein/Google Drive/TopoImport/${id}_${name}.zip" ${id}*.osm
 rm ${id}.osm
 rm ${id}*.osm
 rm "${id}_N50_Arealdekke.sos"
