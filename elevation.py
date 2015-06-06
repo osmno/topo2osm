@@ -1,4 +1,5 @@
 from osgeo import gdal
+from osgeo.gdal_array import *
 import os
 
 class DemFile:

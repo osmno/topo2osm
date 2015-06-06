@@ -147,7 +147,7 @@ def checkDirection(way,ways,endNodes,decidedWays,nodesToCircularWay):
 def turnRivers(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     
-    ways = osmFile.xpath("way")
+    ways = osmFile.getroot().findall("way")
     nodes = nodes2nodeList(osmFile.findall("node"))
     endNodes = EndNodes()
     wayUnknownDir = set()
@@ -185,7 +185,7 @@ def turnRivers(fileName,fileNameOut):
     ways = nodes2nodeList(ways)
     
     nodesToCircularWay = dict()
-    for rel in osmFile.xpath("relation"):
+    for rel in osmFile.getroot().findall("relation"):
         isWater = False
         for tag in rel.findall("tag"):
             if tag.attrib["k"] == "waterway" or (tag.attrib["k"] == "natural" and tag.attrib["v"] == "water"):

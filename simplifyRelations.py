@@ -129,9 +129,9 @@ def simplifyRelations(osmFile,relations):
 def removeRel(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     
-    relations = osmFile.xpath("relation")
-    ways = nodes2nodeList(osmFile.xpath("way"))
-    nodes = nodes2nodeList(osmFile.xpath("node"))
+    relations = osmFile.getroot().findall("relation")
+    ways = nodes2nodeList(osmFile.getroot().findall("way"))
+    nodes = nodes2nodeList(osmFile.getroot().findall("node"))
     for rel in relations:
         keep = False
         for tag in rel.findall("tag"):
@@ -156,18 +156,18 @@ def removeRel(fileName,fileNameOut):
             osmFile.getroot().remove(rel)
     
     wrappedRelations = []
-    for rel in osmFile.xpath("relation"):
+    for rel in osmFile.getroot().findall("relation"):
         wrappedRelations.append(relationWrapper(rel))
     
     simplifyRelations(osmFile,wrappedRelations)
     
     memberWays = set()
-    for rel in osmFile.xpath("relation"):
+    for rel in osmFile.getroot().findall("relation"):
         for member in rel.findall("member"):
             memberWays.add(member.attrib["ref"])
     
     keepNodes = set()
-    for way in osmFile.xpath("way"):
+    for way in osmFile.getroot().findall("way"):
         keep = True
         if not way.attrib["id"] in memberWays:  
             keep = False
@@ -181,7 +181,7 @@ def removeRel(fileName,fileNameOut):
             for nd in way.findall("nd"):
                 keepNodes.add(int(nd.attrib["ref"]))
     
-    for nd in osmFile.xpath("node"):
+    for nd in osmFile.getroot().findall("node"):
         if not int(nd.attrib["id"]) in keepNodes:
             osmFile.getroot().remove(nd)
             

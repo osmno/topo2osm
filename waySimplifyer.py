@@ -30,8 +30,8 @@ import sys
 def simplifyWay(fileName,fileNameOut):
     osmFile = etree.parse(fileName)
     
-    relations = nodes2nodeList(osmFile.xpath("relation"))
-    ways = nodes2nodeList(osmFile.xpath("way"))
+    relations = nodes2nodeList(osmFile.getroot().findall("relation"))
+    ways = nodes2nodeList(osmFile.getroot().findall("way"))
     waysToRelation = dict()
     for ref,rel in relations.iteritems():
         members = rel.findall("member")

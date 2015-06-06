@@ -62,7 +62,7 @@ def copyTags(fromE,toE):
 def hashOsm(osmFile):
     nodesHashed = dict()
     newNode = dict()
-    for nd in osmFile.xpath("node"):
+    for nd in osmFile.getroot().findall("node"):
         ref = hashNode(nd)
         if ref in nodesHashed:
             newNode[nd.attrib["id"]] = nodesHashed[ref].attrib["id"]
@@ -70,11 +70,11 @@ def hashOsm(osmFile):
             osmFile.getroot().remove(nd)
         else:
             nodesHashed[ref] = nd
-    nodes = nodes2nodeList(osmFile.xpath("node"))
+    nodes = nodes2nodeList(osmFile.getroot().findall("node"))
     
     
     waysHashed = dict()
-    for way in osmFile.xpath("way"):
+    for way in osmFile.getroot().findall("way"):
         for nd in way.findall("nd"):
             ref = nd.attrib["ref"]
             if ref in newNode:
@@ -91,10 +91,10 @@ def hashOsm(osmFile):
         waysHashed[ref] = way
         
         
-    ways = nodes2nodeList(osmFile.xpath("way"))    
+    ways = nodes2nodeList(osmFile.getroot().findall("way"))    
 
     relationsHashed = dict()
-    for rel in osmFile.xpath("relation"):
+    for rel in osmFile.getroot().findall("relation"):
         ref = hashRelation(rel, ways, nodes)
         if ref in relationsHashed:
             raise ValueError("Two relation have same hash: %s" % ref)
@@ -159,10 +159,10 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
         print url
     res = requests.get(url)
     oldOsm = ET.fromstring(res.content)
-    nodesOsm = nodes2nodeList(oldOsm.xpath("node"))
-    waysOsm = nodes2nodeList(oldOsm.xpath("way"))
+    nodesOsm = nodes2nodeList(oldOsm.findall("node"))
+    waysOsm = nodes2nodeList(oldOsm.findall("way"))
     new2osmNodes = dict()
-    for nd in oldOsm.xpath("node"):
+    for nd in oldOsm.findall("node"):
         if hashNode(nd) in nodesHashed:
             new2osmNodes[nodesHashed[hashNode(nd)].attrib["id"]] = nd.attrib["id"]
             try:
@@ -172,7 +172,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
     new2osmWays = dict()
     includedNodes = set()
     includedWays = set()
-    for wayOsm in oldOsm.xpath("way"):
+    for wayOsm in oldOsm.findall("way"):
         if hashWay(wayOsm, nodesOsm) in waysHashed:
             newWay = waysHashed[hashWay(wayOsm, nodesOsm)]
             new2osmWays[newWay.attrib["id"]] = wayOsm.attrib["id"]
@@ -220,6 +220,8 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
+                elif (importCoastline and (k == "natural" and v == "coastline")):
+                    shouldBeIncluded = True
                 if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
                     fromN50 = True
             if shouldBeIncluded:
@@ -266,6 +268,8 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     shouldBeIncluded = True
                 elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
                     shouldBeIncluded = True
+                elif (importCoastline and (k == "natural" and v == "coastline")):
+                    shouldBeIncluded = True
         
             if shouldBeIncluded:
                 if not relFromN50:
@@ -290,7 +294,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 if nd.attrib["ref"] in new2osmNodes:
                     nd.attrib["ref"] = new2osmNodes[nd.attrib["ref"]]
      
-    for rel in osmImport.xpath("relation"):
+    for rel in osmImport.getroot().findall("relation"):
         for member in rel.findall("member"):
             if member.attrib["type"] == "way":
                 if member.attrib["ref"] in new2osmWays:
@@ -319,6 +323,7 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [
         importWater = False
         importAreal = False
         importWay = False
+        importCoastline = False
         if (len(sys.argv) == 4):
             imp = sys.argv[3]
             if imp== "--import:water":
@@ -329,10 +334,13 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [
                 importAreal = True
             elif imp == "--import:way":
                 importWay = True
+            elif imp == "--import:coastline":
+                importCoastline = True
             elif imp == "--import:all":
                 importAreal = True
                 importWater = True
                 importWay = True
+                importCoastline = True
             else:
                 print("""The script requires at least two inputs:
 Usage:
