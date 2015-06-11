@@ -1,7 +1,10 @@
 #!/bin/bash
-set -e
+#set -e
 file="$1"
 id=$(echo $file | grep -o '[0-9]\{3,4\}')
+folder="${id}_landcover"
+mkdir $folder
+prefix="$folder/${id}_landcover"
 name=$(echo $file | grep -o '[a-zæøåA-ZÆØÅ]*_UTM33');
 if [ ${#id} -lt 4 ]
   then 
@@ -9,14 +12,13 @@ if [ ${#id} -lt 4 ]
 fi
 
 unzip -uq $file "${id}_N50_Arealdekke.sos"
-sosi2osm "${id}_N50_Arealdekke.sos" arealdekkeUvann.lua ${id}.osm
-python waySimplifyer.py ${id}.osm ${id}.osm
-python emptyRemover.py ${id}.osm ${id}.osm
-python removeExcessiveNodes.py ${id}.osm ${id}.osm .1
-python simplifyRelations.py  ${id}.osm ${id}.osm
-python splitterOsm.py ${id}.osm ${id}_area_part
-#zip -d "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" ${id}_area_part*.osm
-zip -q "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" ${id}_area_part*.osm
-rm ${id}.osm
-rm ${id}*.osm
+sosi2osm "${id}_N50_Arealdekke.sos" arealdekkeUvann.lua ${prefix}.osm
+python waySimplifyer.py ${prefix}.osm ${prefix}.osm
+python emptyRemover.py ${prefix}.osm ${prefix}.osm
+python removeExcessiveNodes.py ${prefix}.osm ${prefix}.osm .1
+python simplifyRelations.py  ${prefix}.osm ${prefix}.osm
+python splitterOsm.py ${prefix}.osm ${prefix}_part
+zip -rq "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" $folder/
+rm $folder/*
+rmdir $folder
 rm "${id}_N50_Arealdekke.sos"

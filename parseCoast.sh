@@ -2,7 +2,9 @@
 
 file="$1"
 id=$(echo $file | grep -o '[1-2]*\d\d\d')
-prefix=${id}_coast
+folder="${id}_coast"
+mkdir $folder
+prefix="$folder/${id}_coast"
 name=$(echo $file | grep -o '[a-zæøåA-ZÆØÅ]*_UTM\d\d');
 if [ ${#id} -lt 4 ]
   then 
@@ -16,7 +18,7 @@ python emptyRemover.py ${prefix}.osm ${prefix}.osm
 python coastCorrector.py ${prefix}.osm ${prefix}.osm
 python removeExcessiveNodes.py ${prefix}.osm ${prefix}.osm .1
 python splitterOsm.py ${prefix}.osm ${prefix}_part --keepAdjacentWays
-zip -q "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" ${prefix}*.osm
-rm ${prefix}.osm
-rm ${prefix}*.osm
+zip -rq "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" $folder/
+rm $folder/*
+rmdir $folder
 rm "${id}_N50_Arealdekke.sos"

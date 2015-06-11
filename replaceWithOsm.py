@@ -162,6 +162,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
     nodesOsm = nodes2nodeList(oldOsm.findall("node"))
     waysOsm = nodes2nodeList(oldOsm.findall("way"))
     new2osmNodes = dict()
+    includedNodes = set()
     for nd in oldOsm.findall("node"):
         if hashNode(nd) in nodesHashed:
             new2osmNodes[nodesHashed[hashNode(nd)].attrib["id"]] = nd.attrib["id"]
@@ -169,8 +170,24 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 osmImport.getroot().remove(nodesHashed[hashNode(nd)])
             except ValueError:
                 print("There is a duplicate node in OSM at position: %s %s, id: %s" %(nd.attrib["lon"],nd.attrib["lat"], nd.attrib["id"]))
+        if importCoastline:
+            shouldBeIncluded = False
+            fromN50 = False
+            for tag in nd.findall("tag"):
+                k = tag.attrib["k"]
+                v = tag.attrib["v"]
+                if ((k == "natural" and v == "coastline") or (k=="seamark:type" and v != "light_minor")):
+                    shouldBeIncluded = True
+                if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
+                    fromN50 = True
+            if shouldBeIncluded:
+                if not fromN50:
+                    nd.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                    nd.attrib["action"] = "modify"
+                osmImport.getroot().append(nd)
+                includedNodes.add(nd.attrib["id"])
     new2osmWays = dict()
-    includedNodes = set()
+    
     includedWays = set()
     for wayOsm in oldOsm.findall("way"):
         if hashWay(wayOsm, nodesOsm) in waysHashed:
@@ -216,7 +233,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
@@ -266,9 +283,9 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark::type")):
+                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway")):
                     shouldBeIncluded = True
-                elif (importCoastline and (k == "natural" and v == "coastline")):
+                elif (importCoastline and (k == "natural" and v == "coastline") ):
                     shouldBeIncluded = True
         
             if shouldBeIncluded:

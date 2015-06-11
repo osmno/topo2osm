@@ -1,8 +1,10 @@
 #!/bin/bash
-set -e
+#set -e
 file="$1"
 id=$(echo $file | grep -o '[0-9]\{3,4\}')
-prefix="${id}_water"
+folder="${id}_water"
+mkdir $folder
+prefix="$folder/${id}_water"
 name=$(echo $file | grep -o '[a-zæøåA-ZÆØÅ]*_UTM33');
 if [ ${#id} -lt 4 ]
   then 
@@ -16,7 +18,7 @@ python waySimplifyer.py ${prefix}.osm ${prefix}.osm
 python emptyRemover.py ${prefix}.osm ${prefix}.osm
 python removeExcessiveNodes.py ${prefix}.osm ${prefix}.osm .1
 python splitterOsm.py ${prefix}.osm ${prefix}_part
-zip -q "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" ${prefix}*.osm
-rm ${prefix}.osm
-rm ${prefix}*.osm
+zip -rq "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" $folder/
+rm $folder/*
+rmdir $folder
 rm "${id}_N50_Arealdekke.sos"

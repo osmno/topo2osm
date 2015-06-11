@@ -45,9 +45,9 @@ class Splitter:
         
         w2relref = dict()
         for relRef,rel in self.relation.iteritems():
-            for w in rel.findall("mem"):
+            for w in rel.findall("member"):
                 ref = w.attrib["ref"]
-                if ref not in nd2wref:
+                if ref not in w2relref:
                     w2relref[ref] = set()
                 w2relref[ref].add(relRef)
         self.w2relref = w2relref
@@ -103,7 +103,9 @@ class Splitter:
                         break
             if delete:
                 self.osmFile.getroot().remove(self.node[ref])
-            
+         
+        consistencyCheckOfOsm(self.osmFile)
+        consistencyCheckOfOsm(self.splitFile)   
 
                 
     def isNdInBbox(self,ndRef,nd = None):
@@ -127,30 +129,34 @@ class Splitter:
         if (ref in self.inSplitNode and (expand == False or (ref in self.inNdExpanding))):
             return
         
+        
+        if ref not in self.inSplitNode:
+            self.splitFile.getroot().append(deepcopy(node))
+            self.inSplitNode.add(ref)
+            
         if expand:
             self.inNdExpanding.add(ref)
-        
-        self.inSplitNode.add(ref)
-        self.splitFile.getroot().append(deepcopy(node))
-        if expand:
             if ref in self.nd2wref:
                 for wRef in self.nd2wref[ref]:
                     self.addWayToSplit(wRef,True)
+                    
+        
 
     
     def addWayToSplit(self,wRef,expand):
-        if (wRef in self.inSplitWay and (expand == False or (wRef in self.inWayExpanding))):
+        if (wRef in self.inSplitWay and ((expand == True and (wRef in self.inWayExpanding)) or (expand == False))):
             return
 
-        self.inSplitWay.add(wRef)
+            
+        way = self.way[wRef]
         
+        if wRef not in self.inSplitWay:
+            self.inSplitWay.add(wRef)
+            self.splitFile.getroot().append(deepcopy(way))
+
+            
         if expand:
             self.inWayExpanding.add(wRef)
-        
-        way = self.way[wRef]
-        self.splitFile.getroot().append(deepcopy(way))
-
-        if expand:
             if wRef in self.w2relref:
                 for relRef in self.w2relref[wRef]:
                     self.addRelationToSplit(relRef)
@@ -165,40 +171,64 @@ class Splitter:
         self.inSplitRelation.add(ref)
         
         rel = self.relation[ref]
-        self.splitFile.append(deepcopy(rel))
+        self.splitFile.getroot().append(deepcopy(rel))
         
         for w in rel.findall("member"):
-            self.iterateNodeToSplit(w.attrib["ref"], False)
+            self.addWayToSplit(w.attrib["ref"], False)
 
 
 def myround(x, base):
     return base * round(x/base)
 
-def saveFile(latMin,latMax,lonMin,lonMax,osmFile,fileNameOut):
+def saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut):
     if len(osmFile.getroot()) == 0:
         return
-    osmFile.write("%s_%.2f_%.2f_%.2f_%.2f.osm" % (fileNameOut,latMin,latMax,lonMin,lonMax)) 
+    osmFile.write("%s_%d_%.2f_%.2f_%.2f_%.2f.osm" % (fileNameOut,idPart,latMin,latMax,lonMin,lonMax)) 
     
 def splitter(osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays):
     s = Splitter(osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays)
     return (s.osmFile,s.splitFile)
 
-def recursiveSplit(latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays):
+def recursiveSplit(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays):
     if (latMax-latMin) <= .05 and (lonMax-lonMin) <= .05:
-        saveFile(latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
+        saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
+        idPart = idPart + 1
     elif len(osmFile.getroot().findall("node")) < 20000:
-        saveFile(latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
+        saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
+        idPart = idPart + 1
     elif (latMax-latMin) < (lonMax-lonMin):
         lonMed = myround((lonMax-lonMin)/2,dx)+lonMin
         (split1, split2) = splitter(osmFile, -180, 180, -180, lonMed,keepAdjacentWays)
-        recursiveSplit(latMin,latMax,lonMin,lonMed,split1,fileNameOut,keepAdjacentWays)
-        recursiveSplit(latMin,latMax,lonMed,lonMax,split2,fileNameOut,keepAdjacentWays)
+        idPart = recursiveSplit(idPart,latMin,latMax,lonMin,lonMed,split1,fileNameOut,keepAdjacentWays)
+        idPart = recursiveSplit(idPart,latMin,latMax,lonMed,lonMax,split2,fileNameOut,keepAdjacentWays)
     else:
         latMed = myround((latMax-latMin)/2,dx)+latMin
         (split1, split2) = splitter(osmFile,-180, latMed, -180, 180,keepAdjacentWays)
-        recursiveSplit(latMin,latMed,lonMin,lonMax,split1,fileNameOut,keepAdjacentWays)
-        recursiveSplit(latMed,latMax,lonMin,lonMax,split2,fileNameOut,keepAdjacentWays)
+        idPart = recursiveSplit(idPart,latMin,latMed,lonMin,lonMax,split1,fileNameOut,keepAdjacentWays)
+        idPart = recursiveSplit(idPart,latMed,latMax,lonMin,lonMax,split2,fileNameOut,keepAdjacentWays)
+    return idPart
     
+def consistencyCheckOfOsm(osmFile):
+    ndRef = set()
+    for nd in osmFile.getroot().findall("node"):
+        assert(nd.attrib["id"] not in ndRef)
+        ndRef.add(nd.attrib["id"])
+    
+    wRef = set()   
+    for w in osmFile.getroot().findall("way"):
+        ref = w.attrib["id"]
+        assert(ref not in wRef)
+        wRef.add(ref)
+        for nd in w.findall("nd"):
+            assert nd.attrib["ref"] in ndRef, "nd: %s is missing. Belongs to way: %s" % (nd.attrib["ref"],ref)
+    
+    relRef = set()          
+    for rel in osmFile.getroot().findall("relation"):
+        ref =rel.attrib["id"]
+        assert(ref not in relRef)
+        relRef.add(ref)
+        for w in rel.findall("member"):
+            assert(w.attrib["ref"] in wRef)
 
 if __name__ == '__main__':
     fileName = None
@@ -228,6 +258,7 @@ Error: %s            """
             
 
         osmFile = openOsm(fileName)
+        consistencyCheckOfOsm(osmFile)
         latMin = 180
         latMax = -180
         lonMin = 180
@@ -245,5 +276,7 @@ Error: %s            """
         lonMin = lonMin - lonMin % dx
         latMax = latMax + (dx-latMax % dx)
         lonMax = lonMax + (dx-lonMax % dx)
-        recursiveSplit(latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays)
+        recursiveSplit(0,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays)
+
+
 
