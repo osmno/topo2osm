@@ -218,8 +218,8 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     wayOsm.attrib["action"] = "modify"
                     for t in newTags:
                         wayOsm.append(t)
-                if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
-                    reverseWay(wayOsm)
+                #if hashWay(wayOsm, nodesOsm) == reverseHashWay(newWay, nodes):
+                #    reverseWay(wayOsm)
                 osmImport.getroot().append(wayOsm)
             try:
                 osmImport.getroot().remove(newWay)
@@ -233,7 +233,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
+                elif (importAreal and ((k == "natural" and v != "water" and v != "coastline") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True

@@ -61,12 +61,21 @@ class Splitter:
         self.inSplitWay = set()
         self.inSplitRelation = set()
         
+        self.nodeExpandQueue = set()
+        self.nodeNotExpandQueue= set()
         
         # Copy nodes, ways and relations from osm to split
         for ref,nd in self.node.iteritems():
             if self.isNdInBbox(ref, nd):
                 self.addNodeToSplit(ref)
         
+        while len(self.nodeExpandQueue) >0:
+            ref = self.nodeExpandQueue.pop()
+            self.addNodeToSplit(ref, True)
+            
+        while len(self.nodeNotExpandQueue) > 0:
+            ref = self.nodeNotExpandQueue.pop()
+            self.addNodeToSplit(ref, False)
 
         # Remove nodes, ways and relations duplicate from osm        
         wayOsm = dict()
@@ -141,7 +150,14 @@ class Splitter:
                     self.addWayToSplit(wRef,True)
                     
         
-
+    def addNodeToQueue(self,ref,expand):
+        if expand:
+            if ref in self.nodeNotExpandQueue:
+                self.nodeNotExpandQueue.remove(ref)
+            self.nodeExpandQueue.add(ref)
+        else:
+            if ref not in self.nodeExpandQueue:
+                self.nodeNotExpandQueue.add(ref)
     
     def addWayToSplit(self,wRef,expand):
         if (wRef in self.inSplitWay and ((expand == True and (wRef in self.inWayExpanding)) or (expand == False))):
@@ -162,7 +178,7 @@ class Splitter:
                     self.addRelationToSplit(relRef)
                     
         for nd in way.findall("nd"):
-            self.addNodeToSplit(nd.attrib["ref"], False)
+            self.addNodeToQueue(nd.attrib["ref"], expand)
                     
     def addRelationToSplit(self,ref):
         if (ref in self.inSplitRelation):
@@ -190,7 +206,7 @@ def splitter(osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays):
     return (s.osmFile,s.splitFile)
 
 def recursiveSplit(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays):
-    if (latMax-latMin) <= .05 and (lonMax-lonMin) <= .05:
+    if (latMax-latMin) <= dx*1.5 and (lonMax-lonMin) <= dx*1.5:
         saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
         idPart = idPart + 1
     elif len(osmFile.getroot().findall("node")) < 20000:
