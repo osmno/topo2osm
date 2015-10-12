@@ -269,7 +269,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
         else:
             
             relFromN50 = False
-            for mem in relOsm.findall("mem"):
+            for mem in relOsm.findall("member"):
                 memRef = mem.attrib["ref"]
                 if memRef in waysOsm:
                     for tag in waysOsm[memRef].findall("tag"):
