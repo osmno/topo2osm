@@ -297,12 +297,11 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     shouldBeIncluded = True
                 if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
                     fromN50 = True
-            if shouldBeIncluded:
-                if not fromN50:
-                    nd.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
-                    nd.attrib["action"] = "modify"
-                osmImport.getroot().append(nd)
-                includedNodes.add(nd.attrib["id"])
+            if shouldBeIncluded and not fromN50:
+                nd.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                nd.attrib["action"] = "modify"
+            osmImport.getroot().append(nd)
+            includedNodes.add(nd.attrib["id"])
     new2osmWays = dict()
     
     includedWays = set()
@@ -358,17 +357,17 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                     shouldBeIncluded = True
                 if k=="source" and (v=="Kartverket N50" or v=="Kartverket" or v=="Statkart"):
                     fromN50 = True
-            if shouldBeIncluded:
-                if not fromN50:
-                    wayOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
-                    wayOsm.attrib["action"] = "modify"
-                osmImport.getroot().append(wayOsm)
-                includedWays.add(wayOsm.attrib["id"])
-                for nd in wayOsm.findall("nd"):
-                    ref = nd.attrib["ref"]
-                    if ref not in includedNodes:    
-                        includedNodes.add(ref)
-                        osmImport.getroot().append(nodesOsm[ref])
+
+            if shouldBeIncluded and not fromN50:
+                wayOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                wayOsm.attrib["action"] = "modify"
+            osmImport.getroot().append(wayOsm)
+            includedWays.add(wayOsm.attrib["id"])
+            for nd in wayOsm.findall("nd"):
+                ref = nd.attrib["ref"]
+                if ref not in includedNodes:    
+                    includedNodes.add(ref)
+                    osmImport.getroot().append(nodesOsm[ref])
             
     new2osmRel = dict()
     for relOsm in oldOsm.findall("relation"):  
@@ -405,22 +404,22 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 elif (importCoastline and (k == "natural" and v == "coastline") ):
                     shouldBeIncluded = True
         
-            if shouldBeIncluded:
-                if not relFromN50:
-                    relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
-                    relOsm.attrib["action"] = "modify"
-                osmImport.getroot().append(relOsm)
-                for w in relOsm.findall("member"):
-                    wRef = w.attrib["ref"]
-                    if wRef not in includedWays and wRef in waysOsm:
-                        wayOsm = waysOsm[wRef]
-                        osmImport.getroot().append(wayOsm)
-                        includedWays.add(wRef)
-                        for nd in wayOsm.findall("nd"):
-                            ref = nd.attrib["ref"]
-                            if ref not in includedNodes:    
-                                includedNodes.add(ref)
-                                osmImport.getroot().append(nodesOsm[ref])
+
+            if shouldBeIncluded and not relFromN50:
+                relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
+                relOsm.attrib["action"] = "modify"
+            osmImport.getroot().append(relOsm)
+            for w in relOsm.findall("member"):
+                wRef = w.attrib["ref"]
+                if wRef not in includedWays and wRef in waysOsm:
+                    wayOsm = waysOsm[wRef]
+                    osmImport.getroot().append(wayOsm)
+                    includedWays.add(wRef)
+                    for nd in wayOsm.findall("nd"):
+                        ref = nd.attrib["ref"]
+                        if ref not in includedNodes:    
+                            includedNodes.add(ref)
+                            osmImport.getroot().append(nodesOsm[ref])
     
     for ref, way in ways.iteritems():
         if not ref in new2osmWays:
