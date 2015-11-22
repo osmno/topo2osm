@@ -10,6 +10,70 @@ import sys
 import requests
 from misc import reverseWay
 
+def mergeWater(osmImport):
+    oldRelWater = dict()
+    oldRelBank  = dict()
+    newRelWater = dict()
+    newRelBank  = dict()
+    for rel in osmImport.findall("relation"):
+        isRiver = False
+        shouldBeIncluded = False
+        for tag in rel.findall("tag"):
+            k = tag.attrib["k"]
+            v = tag.attrib["v"]
+            if (k == "natural" and v == "water"):
+                shouldBeIncluded = True
+            elif (k == "water" and v ==  "river"):
+                isRiver = True
+        if shouldBeIncluded:
+            idx = int(rel.attrib["id"])
+            if idx>0:
+                if isRiver:
+                    oldRelBank[idx] = rel
+                else:
+                    oldRelWater[idx] = rel
+            else:
+                if isRiver:
+                    newRelBank[idx] = rel
+                else:
+                    newRelWater[idx] = rel
+    
+    #oldMemWater = rel2member(oldRelWater)
+    #oldMemBank  = rel2member(oldRelBank)
+    newMemWater = rel2member(newRelWater)
+    newMemBank  = rel2member(newRelBank)
+    
+    for _,rel in oldRelWater.iteritems():
+        for mem in rel.findall("member"):
+            commonId = mem.attrib['ref'] 
+            if commonId in newMemWater:
+                mergeRels(osmImport,rel,newRelWater[newMemWater[commonId]],commonId)
+
+    for _,rel in oldRelBank.iteritems():
+        for mem in rel.findall("member"):
+            commonId = mem.attrib['ref'] 
+            if commonId in newMemBank:
+                mergeRels(osmImport,rel,newRelBank[newMemBank[commonId]],commonId)
+                
+
+def mergeRels(osmImport,oldRel,newRel,commonId):
+    for mem in newRel.findall("member"):
+        if (mem.attrib['ref'] != commonId):
+            oldRel.append(mem)
+    for mem in oldRel.findall("member"):
+        if (mem.attrib['ref'] == commonId):
+            oldRel.remove(mem)
+    osmImport.getroot().remove(newRel)
+
+
+def rel2member(rels):
+    ways = dict()
+    for idx,rel in rels.iteritems():
+        for mem in rel.findall("member"):
+            if mem.attrib['role'] == "outer":
+                ways[mem.attrib['ref']] = idx
+    return ways 
+
 def nodes2nodeList(nodes):
     l = {}
     for n in nodes:
@@ -322,6 +386,9 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             else:
                 raise Warning("Type of member in relation unknown (id %d)" % rel.attrib["id"])
     
+    if importWater:
+        mergeWater(osmImport)
+
     osmImport.getroot().attrib["upload"] = "True"
     osmImport.write(fileNameOut)
 
