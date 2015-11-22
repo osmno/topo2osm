@@ -103,7 +103,8 @@ def reverseHashWay(way,nodes):
 def hashRelation(relation,ways,nodes):
     hashStr = ""
     for memb in relation.findall("member"):
-        hashStr = "%s:%s" % (hashStr,hashWay(ways[memb.attrib["ref"]], nodes))
+        if memb.attrib["ref"] in ways:
+            hashStr = "%s:%s" % (hashStr,hashWay(ways[memb.attrib["ref"]], nodes))
     return hashStr
 
 def hasConflictingTags(fromE,toE):
@@ -126,7 +127,10 @@ def copyTags(fromE,toE):
 def hashOsm(osmFile):
     nodesHashed = dict()
     newNode = dict()
+    nodesDeleted = set()
     for nd in osmFile.getroot().findall("node"):
+        if ( "action" in nd.attrib and nd.attrib["action"] == "delete"):
+            continue
         ref = hashNode(nd)
         if ref in nodesHashed:
             newNode[nd.attrib["id"]] = nodesHashed[ref].attrib["id"]
@@ -138,6 +142,7 @@ def hashOsm(osmFile):
     
     
     waysHashed = dict()
+    waysDeleted = set()
     for way in osmFile.getroot().findall("way"):
         for nd in way.findall("nd"):
             ref = nd.attrib["ref"]
@@ -145,7 +150,10 @@ def hashOsm(osmFile):
                 nd.attrib["ref"] =  newNode[ref]
         ref = hashWay(way,nodes)
         if len(ref) == 0:
-            raise ValueError("There is an empty way with id: %s. Remove this way and try again." % way.attrib['id'])
+            if ( "action" in way.attrib and way.attrib["action"] == "delete"):
+                continue
+            else:
+	            raise ValueError("There is an empty way with id: %s. Remove this way and try again." % way.attrib['id'])
         if ref in waysHashed:
             raise ValueError("Two ways have the same nodes. Remove duplicates and try again. The ids are: %s and %s. The nodes are: %s" % (way.attrib['id'], waysHashed[ref].attrib['id'],ref))
         waysHashed[ref] = way
@@ -158,7 +166,11 @@ def hashOsm(osmFile):
     ways = nodes2nodeList(osmFile.getroot().findall("way"))    
 
     relationsHashed = dict()
+
+    relationsDeleted = set()
     for rel in osmFile.getroot().findall("relation"):
+        if ( "action" in rel.attrib and rel.attrib["action"] == "delete"):
+            continue
         ref = hashRelation(rel, ways, nodes)
         if ref in relationsHashed:
             raise ValueError("Two relation have same hash: %s" % ref)
@@ -192,7 +204,10 @@ def findOverlappingWay(overLapping,way,waysOsm):
 
 def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLapping=.8):
     osmImport = openOsm(fileName)
-    (nodes,nodesHashed,ways,waysHashed,relationsHashed) = hashOsm(osmImport)
+    nodes = nodes2nodeList(osmImport.xpath("node"))
+    ways = nodes2nodeList(osmImport.xpath("way"))
+    relations = nodes2nodeList(osmImport.xpath("relation"))
+
     latMin = 1000.
     latMax = -latMin
     lonMin = 1000.
@@ -209,9 +224,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
         if lon > lonMax:
             lonMax = lon
             
-    minRelationId = -1;
-    for _,rel in relationsHashed.iteritems():
-        minRelationId = min(minRelationId,int(rel.attrib['id']))
+
         
     
     bbox = "%f,%f,%f,%f" %(lonMin,latMin,lonMax,latMax)
@@ -225,6 +238,46 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
     oldOsm = ET.fromstring(res.content)
     nodesOsm = nodes2nodeList(oldOsm.findall("node"))
     waysOsm = nodes2nodeList(oldOsm.findall("way"))
+    relationsOsm = nodes2nodeList(oldOsm.findall("relation"))
+
+    # Iterate thru import elements with positive id:
+    for ref, nd in nodes.iteritems():
+        if int(ref)<0:
+            continue
+        if ref in nodesOsm:
+            ndOsm = nodesOsm[ref]
+            if nd.attrib["version"] < ndOsm.attrib["version"]:
+                osmImport.getroot().remove(nd)
+        else:
+            osmImport.getroot().remove(nd)
+
+    for ref, w in ways.iteritems():
+        if int(ref)<0:
+            continue
+        if ref in waysOsm:
+            wOsm = waysOsm[ref]
+            if w.attrib["version"] < wOsm.attrib["version"]:
+                osmImport.getroot().remove(w)
+        else:
+            osmImport.getroot().remove(w)
+
+    for ref, rel in relations.iteritems():
+        if int(ref)<0:
+            continue
+        if ref in relationsOsm:
+            relOsm = relationsOsm[ref]
+            if rel.attrib["version"] < relOsm.attrib["version"]:
+                osmImport.getroot().remove(rel)
+        else:
+            osmImport.getroot().remove(rel)
+
+    (nodes,nodesHashed,ways,waysHashed,relationsHashed) = hashOsm(osmImport)
+
+    minRelationId = -1;
+    for _,rel in relationsHashed.iteritems():
+        minRelationId = min(minRelationId,int(rel.attrib['id']))
+
+
     new2osmNodes = dict()
     includedNodes = set()
     for nd in oldOsm.findall("node"):
@@ -297,7 +350,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water" and v != "coastline") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
+                elif (importAreal and ((k == "natural" and v != "water" and v != "coastline" and v!="cliff") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
@@ -328,7 +381,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             new2osmRel[rel.attrib["id"]] = relOsm.attrib["id"]
             try:
                 osmImport.getroot().remove(rel)
-            except KeyError:
+            except ValueError:
                 print("There is a duplicate relation with id: %s" %(relOsm.attrib["id"]))
         else:
             
@@ -384,7 +437,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
                 if member.attrib["ref"] in new2osmNodes:
                     member.attrib["ref"] = new2osmNodes[member.attrib["ref"]]
             else:
-                raise Warning("Type of member in relation unknown (id %d)" % rel.attrib["id"])
+                print("Type of member in relation unknown (id %s)" % rel.attrib["id"])
     
     if importWater:
         mergeWater(osmImport)
