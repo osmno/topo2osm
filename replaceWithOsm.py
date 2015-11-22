@@ -173,7 +173,8 @@ def hashOsm(osmFile):
             continue
         ref = hashRelation(rel, ways, nodes)
         if ref in relationsHashed:
-            raise ValueError("Two relation have same hash: %s" % ref)
+            print("Two relation have same hash");
+#            raise ValueError("Two relation have same hash: %s" % ref)
         relationsHashed[ref] = rel
     return (nodes,nodesHashed,ways,waysHashed,relationsHashed)
 
