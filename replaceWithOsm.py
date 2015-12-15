@@ -23,7 +23,7 @@ def mergeWater(osmImport):
             v = tag.attrib["v"]
             if (k == "natural" and v == "water"):
                 shouldBeIncluded = True
-            elif (k == "water" and v ==  "river"):
+            elif (k == "water" and v ==  "river") or (k== "waterway" and v == "riverbank"):
                 isRiver = True
         if shouldBeIncluded:
             idx = int(rel.attrib["id"])
@@ -40,23 +40,36 @@ def mergeWater(osmImport):
     
     #oldMemWater = rel2member(oldRelWater)
     #oldMemBank  = rel2member(oldRelBank)
-    newMemWater = rel2member(newRelWater)
-    newMemBank  = rel2member(newRelBank)
-    
+    newMemWater = mem2rel(newRelWater)
+    mergedWaterRel = set()
+    newMemBank  = mem2rel(newRelBank)
+    mergedBankRel = set()
+
+    # For each old rel
     for _,rel in oldRelWater.iteritems():
+        # iterate through each member
         for mem in rel.findall("member"):
-            commonId = mem.attrib['ref'] 
-            if commonId in newMemWater:
-                mergeRels(osmImport,rel,newRelWater[newMemWater[commonId]],commonId)
+            commonId = mem.attrib['ref']
+            # if common way
+            if commonId in newMemWater and newMemWater[commonId] not in mergedWaterRel:
+                # Merge rel
+                idxNewRel = newMemWater[commonId]
+                mergeRels(osmImport,rel,newRelWater[idxNewRel],commonId)
+                mergedWaterRel.add(idxNewRel)
+                break
 
     for _,rel in oldRelBank.iteritems():
         for mem in rel.findall("member"):
             commonId = mem.attrib['ref'] 
-            if commonId in newMemBank:
-                mergeRels(osmImport,rel,newRelBank[newMemBank[commonId]],commonId)
+            if commonId in newMemBank and newMemWater[commonId] not in mergedBankRel:
+                idxNewRel = newMemBank[commonId]
+                mergeRels(osmImport,rel,newRelBank[idxNewRel],commonId)
+                mergedBankRel.add(idxNewRel)
+                break
                 
 
 def mergeRels(osmImport,oldRel,newRel,commonId):
+    oldRel.attrib["action"] = "modify"
     for mem in newRel.findall("member"):
         if (mem.attrib['ref'] != commonId):
             oldRel.append(mem)
@@ -66,7 +79,7 @@ def mergeRels(osmImport,oldRel,newRel,commonId):
     osmImport.getroot().remove(newRel)
 
 
-def rel2member(rels):
+def mem2rel(rels):
     ways = dict()
     for idx,rel in rels.iteritems():
         for mem in rel.findall("member"):
