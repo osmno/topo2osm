@@ -114,10 +114,14 @@ def reverseHashWay(way,nodes):
     return hashStr[:-1]
 
 def hashRelation(relation,ways,nodes):
-    hashStr = ""
+    hash = set()
     for memb in relation.findall("member"):
-        if memb.attrib["ref"] in ways:
-            hashStr = "%s:%s" % (hashStr,hashWay(ways[memb.attrib["ref"]], nodes))
+        ref = memb.attrib["ref"]
+        if ref in ways:
+            hash.add(hashWay(ways[memb.attrib["ref"]], nodes))
+    hashStr = ""
+    for ref in sorted(hash):
+        hashStr = "%s:%s" % (hashStr,ref)
     return hashStr
 
 def hasConflictingTags(fromE,toE):
@@ -191,32 +195,9 @@ def hashOsm(osmFile):
         relationsHashed[ref] = rel
     return (nodes,nodesHashed,ways,waysHashed,relationsHashed)
 
-def findOverlappingWay(overLapping,way,waysOsm):
-    nodes = set()
-    for nd in way.findall("nd"):
-        nodes.add(nd.attrib["ref"])
-        
-    bestMatchWay = None
-    bestMatchValue = -1
-    
-    for _,w in waysOsm.iteritems():
-        match = 0
-        n = 0
-        nodesCandidate = w.findall("nd")
-        if (abs(len(nodesCandidate)-len(nodes)) < (1-overLapping)*len(nodes) ):
-            for nd in nodesCandidate:
-                n += 1
-                if nd.attrib["ref"] in nodes:
-                    match += 1
-            value = match/float(n)
-            if (value > overLapping):
-                return w
-            elif (value > bestMatchValue):
-                bestMatchValue = value
-                bestMatchWay = w
-    return bestMatchWay
 
-def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLapping=.8):
+
+def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,waterMerge,overLapping=.8):
     osmImport = openOsm(fileName)
     nodes = nodes2nodeList(osmImport.xpath("node"))
     ways = nodes2nodeList(osmImport.xpath("way"))
@@ -422,25 +403,26 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             if shouldBeIncluded and not relFromN50:
                 relOsm.append(ET.Element("tag", {'k':'FIXME', 'v':'Merge'} ))
                 relOsm.attrib["action"] = "modify"
-            osmImport.getroot().append(relOsm)
-            for w in relOsm.findall("member"):
-                wRef = w.attrib["ref"]
-                if wRef not in includedWays and wRef in waysOsm:
-                    wayOsm = waysOsm[wRef]
-                    osmImport.getroot().append(wayOsm)
-                    includedWays.add(wRef)
-                    for nd in wayOsm.findall("nd"):
-                        ref = nd.attrib["ref"]
-                        if ref not in includedNodes:    
-                            includedNodes.add(ref)
-                            osmImport.getroot().append(nodesOsm[ref])
+        osmImport.getroot().append(relOsm)
+        for w in relOsm.findall("member"):
+            wRef = w.attrib["ref"]
+            if wRef not in includedWays and wRef in waysOsm:
+                wayOsm = waysOsm[wRef]
+                osmImport.getroot().append(wayOsm)
+                includedWays.add(wRef)
+                for nd in wayOsm.findall("nd"):
+                    ref = nd.attrib["ref"]
+                    if ref not in includedNodes:    
+                        includedNodes.add(ref)
+                        osmImport.getroot().append(nodesOsm[ref])
     
     for ref, way in ways.iteritems():
         if not ref in new2osmWays:
             for nd in way.findall("nd"):
                 if nd.attrib["ref"] in new2osmNodes:
                     nd.attrib["ref"] = new2osmNodes[nd.attrib["ref"]]
-     
+    
+    # Replace new id with old id
     for rel in osmImport.getroot().findall("relation"):
         for member in rel.findall("member"):
             if member.attrib["type"] == "way":
@@ -452,7 +434,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,overLa
             else:
                 print("Type of member in relation unknown (id %s)" % rel.attrib["id"])
     
-    if importWater:
+    if importWater and waterMerge:
         mergeWater(osmImport)
 
     osmImport.getroot().attrib["upload"] = "True"
@@ -474,7 +456,8 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [
         importAreal = False
         importWay = False
         importCoastline = False
-        if (len(sys.argv) == 4):
+        waterMerge = True
+        if (len(sys.argv) >= 4):
             imp = sys.argv[3]
             if imp== "--import:water":
                 importWater = True
@@ -498,6 +481,8 @@ python replaceWithOsm.py inputFile outPutfile [--import:water] [--import:area] [
                     
 Unknown flag: %s """ % imp)
                 exit()
-
+            if (len(sys.argv)>=5):
+                if sys.argv[4] == "--no-water-merge":
+                    waterMerge = False
         
-        replaceWithOsm(fileName, fileNameOut,importAreal,importWater,importWay)
+        replaceWithOsm(fileName, fileNameOut,importAreal,importWater,importWay,waterMerge)
