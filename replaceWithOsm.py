@@ -61,7 +61,7 @@ def mergeWater(osmImport):
     for _,rel in oldRelBank.iteritems():
         for mem in rel.findall("member"):
             commonId = mem.attrib['ref'] 
-            if commonId in newMemBank and newMemWater[commonId] not in mergedBankRel:
+            if commonId in newMemBank and newMemBank[commonId] not in mergedBankRel:
                 idxNewRel = newMemBank[commonId]
                 mergeRels(osmImport,rel,newRelBank[idxNewRel],commonId)
                 mergedBankRel.add(idxNewRel)
@@ -170,7 +170,7 @@ def hashOsm(osmFile):
             if ( "action" in way.attrib and way.attrib["action"] == "delete"):
                 continue
             else:
-	            raise ValueError("There is an empty way with id: %s. Remove this way and try again." % way.attrib['id'])
+                raise ValueError("There is an empty way with id: %s. Remove this way and try again." % way.attrib['id'])
         if ref in waysHashed:
             raise ValueError("Two ways have the same nodes. Remove duplicates and try again. The ids are: %s and %s. The nodes are: %s" % (way.attrib['id'], waysHashed[ref].attrib['id'],ref))
         waysHashed[ref] = way
@@ -344,7 +344,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,waterM
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water" and v != "coastline" and v!="cliff") or k=="landuse" or k=="leisure" or k=="aeroway" or k=="seamark:type")):
+                elif (importAreal and ((k == "natural" and v != "water" and v != "coastline" and v!="cliff") or k=="landuse" or (k=="leisure" and v!="nature_reserve") or k=="aeroway" or k=="seamark:type")):
                     shouldBeIncluded = True
                 elif (importWay and (k == "highway" or k=="barrier")):
                     shouldBeIncluded = True
@@ -394,7 +394,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,waterM
                 v = tag.attrib["v"]
                 if (importWater and ((k == "natural" and v == "water") or (k == "waterway"))):
                     shouldBeIncluded = True
-                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or k=="leisure" or k=="aeroway")):
+                elif (importAreal and ((k == "natural" and v != "water") or k=="landuse" or (k=="leisure" and v!="nature_reserve") or k=="aeroway")):
                     shouldBeIncluded = True
                 elif (importCoastline and (k == "natural" and v == "coastline") ):
                     shouldBeIncluded = True
