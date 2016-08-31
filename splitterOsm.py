@@ -15,10 +15,10 @@ def openOsm(fileName):
 
 class Splitter:
     def __init__(self,_osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays):
-        self.osmFile = _osmFile
+        self.outsideFile = _osmFile
         element = etree.fromstring('<?xml version="1.0"?><osm/>')
         element.attrib.update(_osmFile.getroot().attrib)
-        self.splitFile = etree.ElementTree(element)
+        self.insideFile = etree.ElementTree(element)
         
         self.keepAdjacentWays = keepAdjacentWays
         self.latMin = latMin
@@ -26,9 +26,9 @@ class Splitter:
         self.lonMin = lonMin
         self.lonMax = lonMax
         
-        self.node = nodes2nodeList(self.osmFile.getroot().findall("node"))
-        self.way = nodes2nodeList(self.osmFile.getroot().findall("way"))
-        self.relation = nodes2nodeList(self.osmFile.getroot().findall("relation"))
+        self.node = nodes2nodeList(self.outsideFile.getroot().findall("node"))
+        self.way = nodes2nodeList(self.outsideFile.getroot().findall("way"))
+        self.relation = nodes2nodeList(self.outsideFile.getroot().findall("relation"))
         
         
         
@@ -67,12 +67,12 @@ class Splitter:
         # Copy nodes, ways and relations from osm to split
         for ref,nd in self.node.iteritems():
             if self.isNdInBbox(ref, nd):
-                self.addNodeToSplit(ref)
+                self.addNodeToSplit(ref,True)
         
         while len(self.nodeExpandQueue) >0:
             ref = self.nodeExpandQueue.pop()
             self.addNodeToSplit(ref, True)
-            
+        
         while len(self.nodeNotExpandQueue) > 0:
             ref = self.nodeNotExpandQueue.pop()
             self.addNodeToSplit(ref, False)
@@ -89,7 +89,7 @@ class Splitter:
         
         
         for ref in self.inSplitRelation:
-            self.osmFile.getroot().remove(relOsm[ref])
+            self.outsideFile.getroot().remove(relOsm[ref])
             del relOsm[ref]
 
         for ref in self.inSplitWay:
@@ -100,7 +100,7 @@ class Splitter:
                         delete = False
                         break
             if delete:
-                self.osmFile.getroot().remove(self.way[ref])
+                self.outsideFile.getroot().remove(self.way[ref])
                 del wayOsm[ref]
                 
         for ref in self.inSplitNode:
@@ -111,10 +111,10 @@ class Splitter:
                         delete = False
                         break
             if delete:
-                self.osmFile.getroot().remove(self.node[ref])
+                self.outsideFile.getroot().remove(self.node[ref])
          
-        consistencyCheckOfOsm(self.osmFile)
-        consistencyCheckOfOsm(self.splitFile)   
+        consistencyCheckOfOsm(self.outsideFile)
+        consistencyCheckOfOsm(self.insideFile)   
 
                 
     def isNdInBbox(self,ndRef,nd = None):
@@ -122,17 +122,15 @@ class Splitter:
             nd = self.node[ndRef]
         lat = float(nd.attrib["lat"])
         lon = float(nd.attrib["lon"])
-        return lat <= self.latMin or lat >= self.latMax or lon <= self.lonMin or lon >= self.lonMax
+        return not (lat <= self.latMin or lat >= self.latMax or lon <= self.lonMin or lon >= self.lonMax)
     
     
-    def addNodeToSplit(self,ref,expand = None,node=None):
+    def addNodeToSplit(self,ref,expand,node=None):
 
         if (node is None):
             node = self.node[ref]
         
-        if expand is None:
-            expand = self.keepAdjacentWays or self.isNdInBbox(ref,node)
-        elif self.keepAdjacentWays:
+        if self.keepAdjacentWays:
             expand = True 
         
         if (ref in self.inSplitNode and (expand == False or (ref in self.inNdExpanding))):
@@ -140,7 +138,7 @@ class Splitter:
         
         
         if ref not in self.inSplitNode:
-            self.splitFile.getroot().append(deepcopy(node))
+            self.insideFile.getroot().append(deepcopy(node))
             self.inSplitNode.add(ref)
             
         if expand:
@@ -168,7 +166,7 @@ class Splitter:
         
         if wRef not in self.inSplitWay:
             self.inSplitWay.add(wRef)
-            self.splitFile.getroot().append(deepcopy(way))
+            self.insideFile.getroot().append(deepcopy(way))
 
             
         if expand:
@@ -178,7 +176,7 @@ class Splitter:
                     self.addRelationToSplit(relRef)
                     
         for nd in way.findall("nd"):
-            self.addNodeToQueue(nd.attrib["ref"], expand)
+            self.addNodeToQueue(nd.attrib["ref"], self.keepAdjacentWays)
                     
     def addRelationToSplit(self,ref):
         if (ref in self.inSplitRelation):
@@ -187,7 +185,7 @@ class Splitter:
         self.inSplitRelation.add(ref)
         
         rel = self.relation[ref]
-        self.splitFile.getroot().append(deepcopy(rel))
+        self.insideFile.getroot().append(deepcopy(rel))
         
         for w in rel.findall("member"):
             self.addWayToSplit(w.attrib["ref"], False)
@@ -203,9 +201,10 @@ def saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut):
     
 def splitter(osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays):
     s = Splitter(osmFile,latMin,latMax,lonMin,lonMax,keepAdjacentWays)
-    return (s.osmFile,s.splitFile)
+    return (s.insideFile,s.outsideFile)
 
 def recursiveSplit(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut,keepAdjacentWays):
+    #print("testing area %.2f %.2f %.2f %.2f" % (latMin,latMax,lonMin,lonMax));
     if (latMax-latMin) <= dx*1.5 and (lonMax-lonMin) <= dx*1.5:
         saveFile(idPart,latMin,latMax,lonMin,lonMax,osmFile,fileNameOut)
         idPart = idPart + 1

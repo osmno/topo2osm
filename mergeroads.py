@@ -4,8 +4,9 @@ import geographiclib.geodesic as gg
 import sys
 import cProfile
 from numpy import arctan2
+from copy import deepcopy
 
-
+debug = 0
 
 def nodes2nodeList(nodes):
     l = {}
@@ -41,7 +42,7 @@ def combineRoads(ways):
         k = '%s%d' % (highway,ref)
         if highway is '' or ref is -1:
             k = str(unknownRef)
-            unknownRef += 1        
+            unknownRef -= 1        
         if k in l:
             l[k].addWay(w)
         else:
@@ -111,11 +112,6 @@ def distanceBetweenWays(way1, nodes1, way2, nodes2,cropStartWay1,cropEndWay1):
     distance = []
     nodesWay1 = way1.findall("nd")
     
-    if len(nodesWay1) < 2 or (cropStartWay1 >= cropEndWay1 and cropEndWay1 > 0) or (cropStartWay1 is len(nodesWay1) -1) :
-        print('Ignoring way with one node. CropStart: %d CropEnd: %d Length: %d' % (cropStartWay1,cropEndWay1, len(nodesWay1)))
-        return (1e100,1e100)
-    else:
-        print('Not ignoring way with one node. CropStart: %d CropEnd: %d Length: %d' % (cropStartWay1,cropEndWay1, len(nodesWay1)))
     n = nodes1[nodesWay1[1].attrib['ref']]
     prevLat = float(n.attrib['lat'])
     prevLon = float(n.attrib['lon'])
@@ -136,6 +132,10 @@ def distanceBetweenWays(way1, nodes1, way2, nodes2,cropStartWay1,cropEndWay1):
             distance.append(d)
         prevLat = lat
         prevLon = lon
+        
+        
+    if len(distance) < 2:
+        return (1e100,1e100)
     # Find mean and variance of distance between roads
     mean = 0.
     for d in distance:
@@ -148,9 +148,9 @@ def distanceBetweenWays(way1, nodes1, way2, nodes2,cropStartWay1,cropEndWay1):
     variance = variance**.5
     return (mean,variance)
 
-# Find the closest nodes to the begining and end of newWay in nodesCandidate
+# Find the closest nodes to the beginning and end of newWay in nodesCandidate
 def findCropCandidate(way1,nodes1,way2,nodes2):
-    # Find begining and end of road
+    # Find beginning and end of road
     beginingWay1ToWay2 =  nearestNodeInWay(nodes1[way1.findall('nd')[0].attrib["ref"]],way2,nodes2)
     endWay1ToWay2 =       nearestNodeInWay(nodes1[way1.findall('nd')[-1].attrib["ref"]],way2,nodes2)
     beginingWay2ToWay1 =  nearestNodeInWay(nodes2[way2.findall('nd')[0].attrib["ref"]],way1,nodes1)
@@ -158,7 +158,7 @@ def findCropCandidate(way1,nodes1,way2,nodes2):
     ## Check if candidate way should be reversed
     cropStartWay1 = 0
     cropEndWay1 = 0
-    # Check which begining is closest to the other road
+    # Check which beginning is closest to the other road
     if (beginingWay2ToWay1['node']<endWay2ToWay1['node']):
         if beginingWay2ToWay1['distance']<beginingWay1ToWay2['distance']:
             cropStartWay1 = beginingWay2ToWay1['node']
@@ -179,10 +179,10 @@ def findCropCandidate(way1,nodes1,way2,nodes2):
             cropStartWay1 = endWay2ToWay1['node']
         else:
             cropStartWay1 = 0  
-    assert (cropStartWay1 < cropEndWay1) or (cropEndWay1 is -1), "crop start %d crop end %d" % (cropStartWay1,cropEndWay1)
+    assert (cropStartWay1 <= cropEndWay1) or (cropEndWay1 is -1), "crop start %d crop end %d" % (cropStartWay1,cropEndWay1)
     return cropStartWay1, cropEndWay1
 
-## remove delted nodes
+## remove deleted nodes
 def removeNodesNotInWay(newOsm, newNodes):
     # list all nodes
     ref = set()
@@ -238,10 +238,25 @@ def main():
         
     new = ET.parse(sys.argv[1])
     old = ET.parse(sys.argv[2])
+    if debug:
+        logFile = ET.ElementTree(ET.fromstring("""<osm version='0.6' upload='false' generator='JOSM'></osm>"""))
     
     newWays = new.findall("way")
     newNodes = nodes2nodeList(new.findall("node"))
     oldWays = old.findall("way")
+    
+    tmp = list()
+    for w in oldWays:
+        isRoad = False
+        for t in w.findall("tag"):
+            if(t.attrib["k"] == "highway"):
+                isRoad = True
+                
+        if isRoad:
+            tmp.append(w)
+            
+    oldWays = tmp
+            
     oldNodes = nodes2nodeList(old.findall("node"))
     
     for i in range(len(newWays)):
@@ -254,23 +269,62 @@ def main():
     for _,newWay in newWays.iteritems():
         # Find roads with overlapping bBox (Union)
         closeWays = findCloseOverlappingRoads(newWay,oldWays)
+        closest = 1e110
+        closestId = ""
+        removed = False
         for wayCandidate in closeWays:
             cropStartCandidate, cropEndCandidate = findCropCandidate(wayCandidate,oldNodes,newWay,newNodes)
-            mean, variance = distanceBetweenWays(newWay,newNodes,wayCandidate,oldNodes,cropStartCandidate,cropEndCandidate)
-            if abs(mean) < 20 and variance < 5**2:
+            mean, variance = distanceBetweenWays(wayCandidate,oldNodes,newWay,newNodes,cropStartCandidate,cropEndCandidate)
+            if abs(mean) < 5 and variance < 5**2 and cropStartCandidate != cropEndCandidate:
                 # newWay is in oldWays if mean<tolMean and var<tolVar
                 for way in newWay.ways:
                     new.getroot().remove(way)
+                
+                if debug:
+                    logElement = ET.Element("tag")
+                    logElement.attrib["k"]="DEBUG"
+                    note = "Removed since candidate ways have mean distance: %f var: %f waysId:" % (mean, variance)
+                    for way in wayCandidate.ways:
+                        note += "%s," % way.attrib["id"]
+                    logElement.attrib["v"] = note
+                    
+                    for way in newWay.ways:
+                        way.append(logElement)
+                        logFile.getroot().append(way)
+                removed = True
                 break
+            else:
+                if closest > abs(mean):
+                    closest = abs(mean)
+                    closestId = ""
+                    for way in wayCandidate.ways:
+                        closestId += "%s," % way.attrib["id"]
+        if not removed and debug:
+            logElement = ET.Element("tag")
+            logElement.attrib["k"]="DEBUG"
+            logElement.attrib["v"] = "Closest way: %f, with id: %s" % (closest,closestId)
+            for way in newWay.ways:
+                way.append(logElement)
+            
     
-    
-    
+
     
     removeNodesNotInWay(new,newNodes)
     new.write(sys.argv[3])
+    
+    if debug:
+        logNodes = dict()
+        for (ref,nd) in newNodes.iteritems():
+            n = deepcopy(nd)
+            logNodes[ref] = n
+            logFile.getroot().append(n)
+            
+        
+        removeNodesNotInWay(logFile,logNodes)
+        logFile.write("log.osm")
 
 if __name__ == "__main__":
-    main()
+    #main()
     
     cProfile.run('main()', 'restats',sort="cumtime")
     import pstats

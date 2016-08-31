@@ -18,7 +18,7 @@ python emptyRemover.py ${prefix}.osm ${prefix}.osm
 python coastCorrector.py ${prefix}.osm ${prefix}.osm
 python removeExcessiveNodes.py ${prefix}.osm ${prefix}.osm .1
 python splitterOsm.py ${prefix}.osm ${prefix}_part --keepAdjacentWays
-zip -rq "/Users/torsteinibo/Google Drive/TopoImport/${id}_${name}.zip" $folder/
+zip -rq "../../Google Drive/TopoImport/${id}_${name}.zip" $folder/
 rm $folder/*
 rmdir $folder
 rm "${id}_N50_Arealdekke.sos"
