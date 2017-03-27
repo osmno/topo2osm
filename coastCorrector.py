@@ -93,8 +93,13 @@ def coastCorrector(fileName,fileNameOut):
     
     i = 0
     for w in osmFile.findall("way"):
-        ways[i]= wayWrapper(w)
-        i += 1
+        isCoastline = False
+        for t in w.findall("tag"):
+            if t.attrib["k"] == "natural" and t.attrib["v"] == "coastline":
+                isCoastline = True
+        if isCoastline:
+            ways[i]= wayWrapper(w)
+            i += 1
     
     nWays = i
     
@@ -110,12 +115,14 @@ def coastCorrector(fileName,fileNameOut):
                         didMerge = True
     
     i = 0
+    idWayIsNotInCircle = 0
     for w in ways.itervalues():
         if w is not None:
             if w.startNode != w.endNode:
+                idWayIsNotInCircle += 1
                 print "Way not in circle"
                 for iw in w.ways:
-                    iw.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of coastline. Land should be on the left side and water on the right side.'} ))
+                    iw.append(etree.Element("tag", {'k':'FIXME', 'v':'Check direction of coastline. Land should be on the left side and water on the right side. Id:%d' % idWayIsNotInCircle} ))
             elif getSumOfAngles(w.ways, nodes) < 0:
                 w.reverse()
 
