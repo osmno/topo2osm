@@ -1,7 +1,7 @@
 #!/bin/bash
-ls TopoPri/*.zip | parallel ./parseCoast.sh
+#ls TopoPri/*.zip | parallel ./parseCoast.sh
 
-for z in TopoPriTung/*.zip
+for z in N50/*.zip
 do
 	echo "Parsing $z"
 	./parseCoast.sh $z
