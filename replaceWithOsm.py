@@ -223,7 +223,7 @@ def replaceWithOsm(fileName,fileNameOut,importAreal,importWater,importWay,waterM
         
     
     bbox = "%f,%f,%f,%f" %(lonMin,latMin,lonMax,latMax)
-    url = "http://overpass.osm.rambler.ru/cgi/xapi_meta?*[bbox=%s]" % bbox
+    url = "https://z.overpass-api.de/api/xapi_meta?*[bbox=%s]" % bbox
     print url
     #[waterway=stream|river]
     if importWay:
