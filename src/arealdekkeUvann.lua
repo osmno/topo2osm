@@ -41,6 +41,10 @@ for i, indent, tokens in tokens, info, 0 do
             out["piste:type"] = "downhill"
         elseif tokens[2] == "Rullebane" then
             out["aeroway"] = "runway"
+            out["FIXME"] = "Draw runway and taxiway as ways, and apron as area/polygon. If this is a taxiway or apron, use aeroway=taxiway or aeroway=apron instead."
+        elseif tokens[2] == "Taksebane" then
+            out["aeroway"] = "taxiway"
+            out["FIXME"] = "Draw taxiway and runway as ways, and apron as area/polygon. If this is a runway or apron, use aeroway=runway or aeroway=apron instead."
         elseif tokens[2] == "Arealbrukgrense" then
         
         elseif tokens[2] == "FiktivDelelinje" then
