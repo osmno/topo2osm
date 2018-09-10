@@ -38,6 +38,8 @@ for i, indent, tokens in tokens, info, 0 do
             return {}
         elseif tokens[2] == "SportIdrettPlass" then
             out["leisure"] = "pitch"
+        elseif tokens[2] == "Park" then
+            out["leisure"] = "park"
         elseif tokens[2] == "Gravplass" then
             out["landuse"] = "cemetery"
         elseif tokens[2] == "Golfbane" then
