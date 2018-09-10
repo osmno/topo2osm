@@ -10,7 +10,10 @@ for i, indent, tokens in tokens, info, 0 do
         elseif tokens[2] == "SnøIsbre" then
             out["natural"]="glacier"
         elseif tokens[2] == "FerskvannTørrfall" then
-            out["natural"]="sand"
+            out["natural"]="shingle"
+            out["intermittent"]="yes"
+            out["waterway"]="riverbank"
+            out["FIXME"]="Check whether the surface should be natural=shingle or natural=sand"
         elseif tokens[2] == "Skog" then
             out["natural"]="wood"
         elseif tokens[2] == "DyrketMark" then
