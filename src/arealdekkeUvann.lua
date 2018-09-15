@@ -26,10 +26,16 @@ for i, indent, tokens in tokens, info, 0 do
             out["landuse"]="industrial"
         elseif tokens[2] == "BymessigBebyggelse" then
             out["landuse"]="residential"
+	elseif tokens[2] == "Hyttefelt" then
+            out["landuse"]="residential"
+	    out["residential"]="cabin"
         elseif tokens[2] == "Havflate" then
             return {}
         elseif tokens[2] == "SportIdrettPlass" then
             out["leisure"] = "pitch"
+	elseif tokens[2] == "Skytefelt" then
+            out["leisure"] = "pitch"
+	    out["sport"] = "shooting"
         elseif tokens[2] == "Park" then
             out["leisure"] = "park"
         elseif tokens[2] == "Gravplass" then
