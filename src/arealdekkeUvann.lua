@@ -20,7 +20,7 @@ for i, indent, tokens in tokens, info, 0 do
             out["landuse"]="farmland"
         elseif tokens[2] == "ÅpentOmråde" then
 
-        elseif tokens[2] == "TettBebyggelse" then
+        elseif tokens[2] == "Tettbebyggelse" then
             out["landuse"]="residential"
         elseif tokens[2] == "Industriområde" then
             out["landuse"]="industrial"
