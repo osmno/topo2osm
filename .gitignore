@@ -1,5 +1,9 @@
 .project
 .pydevproject
-DEM/
+DEM/*
+Converted/
+N50/*
+!DEM/README.md
+!N50/README.md
 *.pyc
 *.osm

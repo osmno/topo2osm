@@ -9,6 +9,9 @@
 if [ ! -d "tmp" ]; then
   mkdir "tmp"
 fi
+if [ ! -d "Converted" ]; then
+  mkdir "Converted"
+fi
 
 ./parseAllWater.sh
 ./parseAllArea.sh
