@@ -3,6 +3,6 @@
 
 for z in N50/*.zip
 do
-	echo "Parsing $z"
+	echo "Parsing $z (coast)"
 	./parseCoast.sh $z
 done

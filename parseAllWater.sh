@@ -3,6 +3,6 @@
 
 for z in N50/*.zip
 do
-	echo "Parsing $z"
+	echo "Parsing $z (water)"
 	./parseWater.sh $z
 done
