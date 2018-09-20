@@ -9,6 +9,8 @@ for i, indent, tokens in tokens, info, 0 do
 			out["wetland"]="bog"
         elseif tokens[2] == "Innsjø" then
 			out["natural"]="water"
+        elseif tokens[2] == "InnsjøRegulert" then
+            out["natural"]="water"
         elseif tokens[2] == "ElvBekk" then
 			out["waterway"]="river"
         elseif tokens[2] == "SnøIsbre" then
