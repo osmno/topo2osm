@@ -8,6 +8,7 @@ for i, indent, tokens in tokens, info, 0 do
 			out["natural"]="water"
 		elseif tokens[2] == "InnsjøRegulert" then
 			out["natural"]="water"
+			out["water"]="reservoir"
         elseif tokens[2] == "ElvBekk" then
 			out["waterway"]="river"
         elseif tokens[2] == "Dam" then
@@ -25,6 +26,8 @@ for i, indent, tokens in tokens, info, 0 do
         out["ele"] = tokens[2]
     elseif tokens[1] == "VANNBR" then
         out["width"] = tokens[2]
+    elseif tokens[1] == "LRV" then
+        out["ele:min"] = tokens[2]
     elseif tokens[1] == "DATAFANGSTDATO" then
         v = tokens[2]
         out["source:date"] = string.format("%s-%s-%s",string.sub(v,1,4),string.sub(v,5,6),string.sub(v,7,8))
