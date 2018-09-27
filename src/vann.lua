@@ -6,7 +6,7 @@ for i, indent, tokens in tokens, info, 0 do
     elseif tokens[1] == "OBJTYPE" then
 		if tokens[2] == "Innsjø" then
 			out["natural"]="water"
-		if tokens[2] == "InnsjøRegulert" then
+		elseif tokens[2] == "InnsjøRegulert" then
 			out["natural"]="water"
         elseif tokens[2] == "ElvBekk" then
 			out["waterway"]="river"
