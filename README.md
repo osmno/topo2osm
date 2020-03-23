@@ -1,4 +1,4 @@
-# kartverket2osm
+# topo2osm
 Converts N50 map data downloaded from Kartverket (SOSI format) to the OpenStreetMap format (.osm). This is a forked version of kartverket2osm originally made by [tibnor](https://github.com/tibnor), and adds several new OSM area types and has support for Karverket's updated file format.
 
 This README describes the Kartverket-to-OSM conversion scripts. If you've downloaded a zip archive with generated OSM files, you only need to use the `replaceWithOsm.py` script, which is described in the section "Oppsett" on the OSM wiki page [Topography import for Norway](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Topography_import_for_Norway#Oppsett) (Norwegian).
