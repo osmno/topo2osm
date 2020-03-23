@@ -45,8 +45,9 @@ for i, indent, tokens in tokens, info, 0 do
         elseif tokens[2] == "Steinbrudd" then
             out["landuse"] = "quarry"
         elseif tokens[2] == "Alpinbakke" then
-            out["route"] = "piste"
+            out["landuse"] = "winter_sports"
             out["piste:type"] = "downhill"
+            out["area"] = "yes"
         elseif tokens[2] == "Rullebane" then
             out["aeroway"] = "runway"
             out["FIXME"] = "Draw runway and taxiway as ways, and apron as area/polygon. If this is a taxiway or apron, use aeroway=taxiway or aeroway=apron instead."
